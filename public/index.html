@@ -708,26 +708,100 @@
         codex: 'https://chatgpt.com/settings/usage?tab=overview',
         kimi: 'https://www.kimi.com/'
       };
+      const labelMap = {
+        antigravity: 'Antigravity',
+        claude: 'Claude',
+        codex: 'Codex',
+        kimi: 'Kimi'
+      };
+      const formatNames = (ids) => (ids || []).map(id => labelMap[id] || id).join(', ');
 
-      document.documentElement.setAttribute('data-quota-open-provider', providerId);
-      document.documentElement.setAttribute('data-quota-sync-request', String(Date.now()));
-      window.postMessage({ type: 'QUOTA_TRACKER_OPEN_PROVIDER', providerId }, window.location.origin);
-      window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+      const extVer = document.documentElement.getAttribute('data-quota-ext');
 
-      if (providerId === 'all') {
-        window.open(urls.antigravity, '_blank', 'noopener,noreferrer');
-        window.open(urls.claude, '_blank', 'noopener,noreferrer');
-        window.open(urls.codex, '_blank', 'noopener,noreferrer');
-        window.open(urls.kimi, '_blank', 'noopener,noreferrer');
-      } else if (urls[providerId]) {
-        window.open(urls[providerId], '_blank', 'noopener,noreferrer');
+      if (!extVer) {
+        if (providerId === 'all') {
+          window.open(urls.antigravity, '_blank', 'noopener,noreferrer');
+          window.open(urls.claude, '_blank', 'noopener,noreferrer');
+          window.open(urls.codex, '_blank', 'noopener,noreferrer');
+          window.open(urls.kimi, '_blank', 'noopener,noreferrer');
+        } else if (urls[providerId]) {
+          window.open(urls[providerId], '_blank', 'noopener,noreferrer');
+        }
+        renderSyncStatusBox(`Opening ${providerId === 'all' ? 'All Providers' : labelMap[providerId] || providerId}...`);
+        return;
       }
 
-      renderSyncStatusBox(`Opening ${providerId === 'all' ? 'All Providers' : providerId} & waiting for Auto-Sync...`);
+      showMainSyncBanner('🔍 กำลังตรวจสอบ Tab ของ LLM ที่เปิดอยู่แล้ว และเปิดเพิ่มเฉพาะเจ้าที่ยังไม่มี...', 'emerald');
+      renderSyncStatusBox('Checking open browser tabs...');
 
-      setTimeout(() => fetchState(), 1200);
-      setTimeout(() => fetchState(), 3000);
-      setTimeout(() => fetchState(), 5500);
+      const ackPromise = new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          window.removeEventListener('message', onAck);
+          resolve(null);
+        }, 4000);
+        function onAck(ev) {
+          if (ev.source === window && ev.data?.type === 'QUOTA_TRACKER_OPEN_PROVIDER_ACK' && ev.data.providerId === providerId) {
+            clearTimeout(timer);
+            window.removeEventListener('message', onAck);
+            resolve(ev.data);
+          }
+        }
+        window.addEventListener('message', onAck);
+      });
+
+      window.postMessage({ type: 'QUOTA_TRACKER_OPEN_PROVIDER', providerId }, window.location.origin);
+      const ack = await ackPromise;
+
+      if (ack && ack.smartTabOpenHandled) {
+        const alreadyOpen = ack.alreadyOpen || [];
+        const opened = ack.opened || [];
+        let msgHtml = '';
+        let statusText = '';
+
+        if (alreadyOpen.length > 0 && opened.length > 0) {
+          msgHtml = `<strong>✓ ตรวจสอบแท็บเรียบร้อย:</strong> เปิดอยู่แล้ว (ไม่เปิดซ้ำ + Sync แล้ว): <strong>${escapeHtml(formatNames(alreadyOpen))}</strong> • 🆕 เปิดเพิ่มเฉพาะที่ยังไม่มี: <strong>${escapeHtml(formatNames(opened))}</strong>`;
+          statusText = `Already open: ${formatNames(alreadyOpen)} | Opened missing: ${formatNames(opened)}`;
+        } else if (alreadyOpen.length > 0) {
+          msgHtml = `<strong>✓ มี Tab เปิดอยู่แล้วครบ (${escapeHtml(formatNames(alreadyOpen))})</strong> — Sync ข้อมูลให้ทันทีโดยไม่เปิด Tab ซ้ำ`;
+          statusText = `All open (${formatNames(alreadyOpen)}) — synced without duplicates`;
+        } else if (opened.length > 0) {
+          msgHtml = `<strong>🚀 เปิด Tab ที่ยังไม่มี (${escapeHtml(formatNames(opened))})</strong> — กำลังรอโหลดและ Auto-Sync...`;
+          statusText = `Opened missing tab(s): ${formatNames(opened)}`;
+        } else {
+          msgHtml = '✓ ตรวจสอบและ Sync แท็บที่เปิดอยู่แล้วเรียบร้อย';
+          statusText = 'Checked open tabs & synced';
+        }
+
+        showMainSyncBanner(msgHtml, 'emerald');
+        renderSyncStatusBox(statusText);
+
+        setTimeout(() => {
+          window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+          fetchState();
+        }, 1500);
+        setTimeout(() => {
+          window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+          fetchState();
+        }, 3500);
+        setTimeout(() => fetchState(), 6000);
+        return;
+      }
+
+      // Fallback when user still has older v4.0.0 extension loaded (before v4.0.1 smart tab check)
+      if (providerId === 'all') {
+        showMainSyncBanner(
+          `<div class="flex flex-wrap items-center justify-between gap-2">` +
+          `<div><strong>⚠ Extension ของคุณยังเป็น v${escapeHtml(extVer)} — กรุณาอัปเดตเป็น v4.0.1 เพื่อให้เช็ก Tab ที่เปิดอยู่แล้วอัตโนมัติ (ไม่เปิดซ้ำ):</strong><br/>` +
+          `ดาวน์โหลดไฟล์ใหม่ แตกไฟล์ทับโฟลเดอร์เดิม แล้วกดปุ่ม <strong>Reload (↻)</strong> ใน <code>brave://extensions</code> แล้ว Refresh หน้านี้</div>` +
+          `<a href="/ai-quota-tracker-extension-v4.0.zip" download class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0 transition">⬇ Download Extension v4.0.1 (.zip)</a>` +
+          `</div>`,
+          'amber'
+        );
+        renderSyncStatusBox('Please update Extension to v4.0.1 for smart tab detection');
+      } else if (urls[providerId]) {
+        window.open(urls[providerId], '_blank', 'noopener,noreferrer');
+        renderSyncStatusBox(`Opening ${labelMap[providerId] || providerId}...`);
+      }
     }
 
     function showMainSyncBanner(html, tone = 'emerald') {

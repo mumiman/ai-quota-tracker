@@ -676,3 +676,37 @@ test('Codex parser ignores "Use a reset to restore your 5-hour limit, weekly lim
   assert.equal(parsed.weeklyResetText, 'Resets in 1d 19h');
   assert.equal(parsed.resetsAvailable.length, 2);
 });
+
+test('Smart Open All checks open tabs and only opens missing provider usage tabs', () => {
+  const { classifyOpenUsageTabs, findMissingUsageProviders } = require('../browser-extension/background');
+
+  const tabsPartial = [
+    { id: 1, url: 'https://ai-quota-tracker-ten.vercel.app/' },
+    { id: 2, url: 'https://antigravity.google.com/remote?settingsOpen=true&settingsScreen=Models' },
+    { id: 3, url: 'https://chatgpt.com/settings/usage?tab=overview' },
+    { id: 4, url: 'https://www.kimi.com/' },
+    // Regular Claude chat tab (no usage page open) should NOT prevent opening claude.ai/settings/usage
+    { id: 5, url: 'https://claude.ai/chat/abc-123' }
+  ];
+
+  const existingPartial = classifyOpenUsageTabs(tabsPartial, {});
+  const partialPlan = findMissingUsageProviders('all', existingPartial);
+  assert.deepEqual(partialPlan.alreadyOpen, ['antigravity', 'codex', 'kimi']);
+  assert.deepEqual(partialPlan.missing, ['claude']);
+
+  // When claude.ai/new#settings/usage (or /settings/usage) is open, nothing is missing
+  const tabsAll = [
+    ...tabsPartial,
+    { id: 6, url: 'https://claude.ai/new#settings/usage' }
+  ];
+  const existingAll = classifyOpenUsageTabs(tabsAll, {});
+  const allPlan = findMissingUsageProviders('all', existingAll);
+  assert.deepEqual(allPlan.alreadyOpen, ['antigravity', 'claude', 'codex', 'kimi']);
+  assert.deepEqual(allPlan.missing, []);
+
+  // Single provider check respects already-open tab
+  const singlePlan = findMissingUsageProviders('codex', existingAll);
+  assert.deepEqual(singlePlan.alreadyOpen, ['codex']);
+  assert.deepEqual(singlePlan.missing, []);
+});
+

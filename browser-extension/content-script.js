@@ -1,5 +1,5 @@
 /**
- * Zero-Click Real-Time Content Script for LLM Quota Tracker (v4.0.0 — Zero-Storage Edition)
+ * Zero-Click Real-Time Content Script for LLM Quota Tracker (v4.0.1 — Zero-Storage Edition)
  *
  * Security & Privacy Guarantee:
  * - Never reads cookies, tokens, API keys, or chat messages.
@@ -7,7 +7,7 @@
  *   via in-browser `chrome.runtime` + `window.postMessage` — zero external server storage.
  */
 (function () {
-  const EXT_VERSION = '4.0.0';
+  const EXT_VERSION = '4.0.1';
   const host = window.location.hostname || '';
   const port = window.location.port || '';
   let debounceTimer = null;
@@ -113,7 +113,6 @@
 
       if (event.data.type === 'QUOTA_TRACKER_OPEN_PROVIDER') {
         const providerId = event.data.providerId || 'all';
-        document.documentElement.setAttribute('data-quota-open-provider', providerId);
         try {
           chrome.runtime.sendMessage({ type: 'OPEN_AND_SYNC_PROVIDER', providerId }, (resp) => {
             if (!chrome.runtime.lastError && resp?.ok) {
@@ -121,6 +120,10 @@
               window.postMessage({
                 type: 'QUOTA_TRACKER_OPEN_PROVIDER_ACK',
                 providerId,
+                smartTabOpenHandled: Boolean(resp.smartTabOpenHandled),
+                alreadyOpen: Array.isArray(resp.alreadyOpen) ? resp.alreadyOpen : [],
+                opened: Array.isArray(resp.opened) ? resp.opened : [],
+                syncedProviders: Array.isArray(resp.syncedProviders) ? resp.syncedProviders : [],
                 foundAntigravityTab: Boolean(resp.foundAntigravityTab),
                 syncedAntigravity: Boolean(resp.syncedAntigravity)
               }, window.location.origin);

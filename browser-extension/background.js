@@ -1,5 +1,5 @@
 /**
- * Background Service Worker for LLM Quota Tracker Real-Time Auto-Sync (v4.0.0 — Zero-Storage Edition)
+ * Background Service Worker for LLM Quota Tracker Real-Time Auto-Sync (v4.0.1 — Zero-Storage Edition)
  *
  * Security & Privacy Guarantee:
  * 1. Direct In-Browser Bridge: Extracted usage text is broadcast directly to open Dashboard tabs
@@ -11,9 +11,108 @@
  */
 
 const LOCAL_TRACKER_BASE = 'http://localhost:3456';
+const PROVIDER_USAGE_URLS = {
+  antigravity: 'https://antigravity.google.com/remote?settingsOpen=true&settingsScreen=Models',
+  claude: 'https://claude.ai/settings/usage',
+  codex: 'https://chatgpt.com/settings/usage?tab=overview',
+  kimi: 'https://www.kimi.com/'
+};
+
 let lastPushedSignatures = {};
 let latestExtractedPayloads = {};
 let isScanning = false;
+let openTabsInFlight = null;
+const lastOpenedAtByProvider = {};
+
+function isDashboardTabUrl(urlLower) {
+  if (!urlLower) return false;
+  return (
+    urlLower.includes('localhost:3456') ||
+    urlLower.includes('127.0.0.1:3456') ||
+    urlLower.includes('.vercel.app')
+  );
+}
+
+function classifyOpenUsageTabs(tabs, extractedByTabId = {}) {
+  const existing = {
+    antigravity: null,
+    claude: null,
+    codex: null,
+    kimi: null
+  };
+
+  for (const tab of tabs || []) {
+    if (!tab || !tab.id) continue;
+    const rawUrl = tab.url || tab.pendingUrl || '';
+    const urlLower = rawUrl.toLowerCase();
+    if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) continue;
+    if (isDashboardTabUrl(urlLower)) continue;
+
+    const extracted = extractedByTabId[tab.id] || {};
+    let host = '';
+    try {
+      host = new URL(rawUrl).hostname.toLowerCase();
+    } catch {
+      host = '';
+    }
+
+    if (
+      !existing.antigravity &&
+      (host.includes('antigravity.google.com') ||
+        extracted.providerId === 'antigravity' ||
+        extracted.isAntigravityTab)
+    ) {
+      existing.antigravity = tab;
+    }
+
+    if (
+      !existing.claude &&
+      (extracted.providerId === 'claude' ||
+        (host.includes('claude.ai') &&
+          (urlLower.includes('usage') || urlLower.includes('/settings'))))
+    ) {
+      existing.claude = tab;
+    }
+
+    if (
+      !existing.codex &&
+      (extracted.providerId === 'codex' ||
+        ((host.includes('chatgpt.com') || host.includes('openai.com')) &&
+          (urlLower.includes('usage') || urlLower.includes('/settings'))))
+    ) {
+      existing.codex = tab;
+    }
+
+    if (
+      !existing.kimi &&
+      (extracted.providerId === 'kimi' ||
+        host.includes('kimi.com') ||
+        host.includes('kimi.ai') ||
+        host.includes('moonshot.cn'))
+    ) {
+      existing.kimi = tab;
+    }
+  }
+
+  return existing;
+}
+
+function findMissingUsageProviders(requestedProviderId, existingMap) {
+  const targets = requestedProviderId === 'all'
+    ? ['antigravity', 'claude', 'codex', 'kimi']
+    : (PROVIDER_USAGE_URLS[requestedProviderId] ? [requestedProviderId] : []);
+
+  const alreadyOpen = [];
+  const missing = [];
+  for (const id of targets) {
+    if (existingMap && existingMap[id]) {
+      alreadyOpen.push(id);
+    } else {
+      missing.push(id);
+    }
+  }
+  return { targets, alreadyOpen, missing };
+}
 
 /**
  * Fast, synchronous DOM extractor injected into open browser tabs via chrome.scripting.executeScript.
@@ -28,7 +127,7 @@ async function extractIsolatedUsageFromTab(tryOpenAntigravityPopover = false) {
 
     // 1. If this tab is the LLM Quota Tracker Dashboard (Vercel or localhost:3456)
     if (isMarkedDashboard || ((host === 'localhost' || host === '127.0.0.1') && port === '3456')) {
-      document.documentElement.setAttribute('data-quota-ext', '4.0.0');
+      document.documentElement.setAttribute('data-quota-ext', '4.0.1');
       const syncReq = document.documentElement.getAttribute('data-quota-sync-request');
       const openReq = document.documentElement.getAttribute('data-quota-open-provider');
       if (syncReq) document.documentElement.removeAttribute('data-quota-sync-request');
@@ -438,17 +537,21 @@ async function reinjectContentScriptsIntoOpenTabs() {
   }
 }
 
-async function openAndSyncProviderTabs(providerId) {
+async function _openAndSyncProviderTabsImpl(providerId) {
   const allTabs = await chrome.tabs.query({});
-  let foundAgyTab = null;
-  let syncedAntigravity = false;
+  const extractedByTabId = {};
+  const syncedSet = new Set();
 
-  if (providerId === 'antigravity' || providerId === 'all') {
-    for (const tab of allTabs) {
-      if (!tab.id || !tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) continue;
-      if (tab.url.includes('localhost:3456') || tab.url.includes('127.0.0.1:3456')) continue;
-      if (tab.url.includes('claude.ai') || tab.url.includes('chatgpt.com') || tab.url.includes('kimi.com')) continue;
+  const candidateTabs = allTabs.filter((tab) => {
+    if (!tab.id) return false;
+    const rawUrl = (tab.url || tab.pendingUrl || '').toLowerCase();
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) return false;
+    return !isDashboardTabUrl(rawUrl);
+  });
 
+  // Scan all non-dashboard open tabs in parallel first (and try opening Antigravity Models popover if needed)
+  await Promise.all(
+    candidateTabs.map(async (tab) => {
       try {
         const results = await chrome.scripting.executeScript({
           target: { tabId: tab.id, allFrames: true },
@@ -457,41 +560,86 @@ async function openAndSyncProviderTabs(providerId) {
         });
         for (const frameRes of (results || [])) {
           const r = frameRes?.result;
-          if (r?.isAntigravityTab) {
-            foundAgyTab = tab;
-            if (r.providerId === 'antigravity' && r.rawText) {
-              const pushRes = await broadcastUsageToDashboardsAndLocal({
-                providerId: 'antigravity',
-                rawText: r.rawText,
-                internalApi: r.internalApi,
-                pageUrl: r.pageUrl,
-                force: true
-              });
-              if (pushRes?.ok) syncedAntigravity = true;
+          if (!r) continue;
+          if (r.isAntigravityTab || r.providerId) {
+            const prev = extractedByTabId[tab.id] || {};
+            extractedByTabId[tab.id] = {
+              providerId: r.providerId || prev.providerId || null,
+              isAntigravityTab: Boolean(r.isAntigravityTab || prev.isAntigravityTab)
+            };
+          }
+          if (r.providerId && r.rawText) {
+            const pushRes = await broadcastUsageToDashboardsAndLocal({
+              providerId: r.providerId,
+              rawText: r.rawText,
+              internalApi: r.internalApi,
+              pageUrl: r.pageUrl,
+              force: true
+            });
+            if (pushRes?.ok) {
+              syncedSet.add(r.providerId);
             }
           }
         }
       } catch {
-        // ignore restricted tab
+        // ignore restricted tab or tab still loading
       }
-    }
+    })
+  );
 
-    if (foundAgyTab && foundAgyTab.id && providerId === 'antigravity') {
-      await chrome.tabs.update(foundAgyTab.id, { active: true }).catch(() => {});
-      if (foundAgyTab.windowId) {
-        await chrome.windows.update(foundAgyTab.windowId, { focused: true }).catch(() => {});
-      }
+  const existingMap = classifyOpenUsageTabs(allTabs, extractedByTabId);
+  const { alreadyOpen, missing } = findMissingUsageProviders(providerId, existingMap);
+  const opened = [];
+
+  for (const id of missing) {
+    const url = PROVIDER_USAGE_URLS[id];
+    if (!url) continue;
+    const now = Date.now();
+    if (now - (lastOpenedAtByProvider[id] || 0) < 3000) continue;
+    lastOpenedAtByProvider[id] = now;
+    try {
+      await chrome.tabs.create({
+        url,
+        active: providerId !== 'all'
+      });
+      opened.push(id);
+    } catch {
+      // ignore tab creation error
     }
   }
 
-  setTimeout(() => scanAllOpenTabs(true), 900);
+  // If clicking a single provider button and its tab already exists, focus it without opening a duplicate
+  if (providerId !== 'all' && existingMap[providerId]?.id) {
+    const targetTab = existingMap[providerId];
+    await chrome.tabs.update(targetTab.id, { active: true }).catch(() => {});
+    if (targetTab.windowId) {
+      await chrome.windows.update(targetTab.windowId, { focused: true }).catch(() => {});
+    }
+  }
+
+  setTimeout(() => scanAllOpenTabs(true), 1000);
   setTimeout(() => scanAllOpenTabs(true), 2500);
   setTimeout(() => scanAllOpenTabs(true), 4500);
+  setTimeout(() => scanAllOpenTabs(true), 7000);
 
   return {
-    foundAntigravityTab: Boolean(foundAgyTab),
-    syncedAntigravity
+    smartTabOpenHandled: true,
+    alreadyOpen,
+    opened,
+    syncedProviders: [...syncedSet],
+    foundAntigravityTab: Boolean(existingMap.antigravity),
+    syncedAntigravity: syncedSet.has('antigravity')
   };
+}
+
+async function openAndSyncProviderTabs(providerId) {
+  if (openTabsInFlight) {
+    return await openTabsInFlight;
+  }
+  openTabsInFlight = _openAndSyncProviderTabsImpl(providerId || 'all').finally(() => {
+    openTabsInFlight = null;
+  });
+  return await openTabsInFlight;
 }
 
 async function scanAllOpenTabs(force = false) {
@@ -566,74 +714,89 @@ async function scanAllOpenTabs(force = false) {
   return syncedCount;
 }
 
-reinjectContentScriptsIntoOpenTabs().then(() => scanAllOpenTabs(true));
-
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create('quota_auto_sync', { periodInMinutes: 0.5 });
-  chrome.storage.local.set({ autoSyncEnabled: true });
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.tabs) {
   reinjectContentScriptsIntoOpenTabs().then(() => scanAllOpenTabs(true));
-});
 
-chrome.runtime.onStartup.addListener(() => {
-  chrome.alarms.create('quota_auto_sync', { periodInMinutes: 0.5 });
-  reinjectContentScriptsIntoOpenTabs().then(() => scanAllOpenTabs(true));
-});
+  chrome.runtime.onInstalled.addListener(() => {
+    chrome.alarms.create('quota_auto_sync', { periodInMinutes: 0.5 });
+    chrome.storage.local.set({ autoSyncEnabled: true });
+    reinjectContentScriptsIntoOpenTabs().then(() => scanAllOpenTabs(true));
+  });
 
-chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
-  if (changeInfo.status === 'complete') {
+  chrome.runtime.onStartup.addListener(() => {
+    chrome.alarms.create('quota_auto_sync', { periodInMinutes: 0.5 });
+    reinjectContentScriptsIntoOpenTabs().then(() => scanAllOpenTabs(true));
+  });
+
+  chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+    if (changeInfo.status === 'complete') {
+      scanAllOpenTabs(false);
+    }
+  });
+
+  chrome.tabs.onActivated.addListener(() => {
     scanAllOpenTabs(false);
-  }
-});
+  });
 
-chrome.tabs.onActivated.addListener(() => {
-  scanAllOpenTabs(false);
-});
+  setInterval(() => {
+    scanAllOpenTabs(false);
+  }, 2000);
 
-setInterval(() => {
-  scanAllOpenTabs(false);
-}, 2000);
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== 'quota_auto_sync') return;
+    await scanAllOpenTabs(false);
+  });
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== 'quota_auto_sync') return;
-  await scanAllOpenTabs(false);
-});
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg.type === 'REGISTER_DASHBOARD_ORIGIN' && msg.dashboardUrl) {
+      chrome.storage.local.set({ lastDashboardOrigin: msg.dashboardUrl }).then(() => {
+        sendResponse({ ok: true });
+      });
+      return true;
+    }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type === 'REGISTER_DASHBOARD_ORIGIN' && msg.dashboardUrl) {
-    chrome.storage.local.set({ lastDashboardOrigin: msg.dashboardUrl }).then(() => {
-      sendResponse({ ok: true });
-    });
-    return true;
-  }
+    if (msg.type === 'AUTO_SYNC_USAGE' || msg.type === 'SYNC_USAGE') {
+      broadcastUsageToDashboardsAndLocal({
+        providerId: msg.providerId,
+        rawText: msg.rawText,
+        internalApi: msg.internalApi,
+        pageUrl: msg.pageUrl,
+        force: Boolean(msg.force)
+      }).then(sendResponse);
+      return true;
+    }
 
-  if (msg.type === 'AUTO_SYNC_USAGE' || msg.type === 'SYNC_USAGE') {
-    broadcastUsageToDashboardsAndLocal({
-      providerId: msg.providerId,
-      rawText: msg.rawText,
-      internalApi: msg.internalApi,
-      pageUrl: msg.pageUrl,
-      force: Boolean(msg.force)
-    }).then(sendResponse);
-    return true;
-  }
+    if (msg.type === 'POLL_ALL_TABS_NOW') {
+      scanAllOpenTabs(true).then((syncedCount) => {
+        const items = Object.values(latestExtractedPayloads);
+        sendResponse({ ok: true, syncedCount, items });
+      });
+      return true;
+    }
 
-  if (msg.type === 'POLL_ALL_TABS_NOW') {
-    scanAllOpenTabs(true).then((syncedCount) => {
-      const items = Object.values(latestExtractedPayloads);
-      sendResponse({ ok: true, syncedCount, items });
-    });
-    return true;
-  }
+    if (msg.type === 'OPEN_AND_SYNC_PROVIDER') {
+      openAndSyncProviderTabs(msg.providerId || 'all').then((res) =>
+        sendResponse({
+          ok: true,
+          handled: true,
+          smartTabOpenHandled: Boolean(res?.smartTabOpenHandled),
+          alreadyOpen: Array.isArray(res?.alreadyOpen) ? res.alreadyOpen : [],
+          opened: Array.isArray(res?.opened) ? res.opened : [],
+          syncedProviders: Array.isArray(res?.syncedProviders) ? res.syncedProviders : [],
+          foundAntigravityTab: Boolean(res?.foundAntigravityTab),
+          syncedAntigravity: Boolean(res?.syncedAntigravity)
+        })
+      );
+      return true;
+    }
+  });
+}
 
-  if (msg.type === 'OPEN_AND_SYNC_PROVIDER') {
-    openAndSyncProviderTabs(msg.providerId || 'all').then((res) =>
-      sendResponse({
-        ok: true,
-        handled: true,
-        foundAntigravityTab: Boolean(res?.foundAntigravityTab),
-        syncedAntigravity: Boolean(res?.syncedAntigravity)
-      })
-    );
-    return true;
-  }
-});
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    PROVIDER_USAGE_URLS,
+    isDashboardTabUrl,
+    classifyOpenUsageTabs,
+    findMissingUsageProviders
+  };
+}
