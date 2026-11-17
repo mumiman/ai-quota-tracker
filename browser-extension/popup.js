@@ -6,14 +6,16 @@ function showStatus(msg, isError = false) {
   statusEl.textContent = msg;
 }
 
+const DEFAULT_DASHBOARD_URL = 'https://ai-quota-tracker-ten.vercel.app/';
+
 async function renderSyncHistory() {
   const { lastSyncMap, lastDashboardOrigin } = await chrome.storage.local.get(['lastSyncMap', 'lastDashboardOrigin']);
   const map = lastSyncMap || {};
   const dashBtn = document.getElementById('openDashboardBtn');
-  if (dashBtn && lastDashboardOrigin) {
+  if (dashBtn) {
     try {
-      const host = new URL(lastDashboardOrigin).host;
-      dashBtn.textContent = `Open Dashboard (${host}) ↗`;
+      const host = new URL(lastDashboardOrigin || DEFAULT_DASHBOARD_URL).host;
+      dashBtn.textContent = `🚀 Open Dashboard (${host}) ↗`;
     } catch {}
   }
 
@@ -30,7 +32,22 @@ async function renderSyncHistory() {
 
 document.getElementById('openDashboardBtn').addEventListener('click', async () => {
   const { lastDashboardOrigin } = await chrome.storage.local.get(['lastDashboardOrigin']);
-  chrome.tabs.create({ url: lastDashboardOrigin || 'http://localhost:3456' });
+  const targetUrl = lastDashboardOrigin || DEFAULT_DASHBOARD_URL;
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find(
+    (t) =>
+      t.url &&
+      (t.url.startsWith(targetUrl) ||
+        t.url.includes('ai-quota-tracker-ten.vercel.app') ||
+        t.url.includes('localhost:3456') ||
+        t.url.includes('127.0.0.1:3456'))
+  );
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    if (existing.windowId) await chrome.windows.update(existing.windowId, { focused: true });
+  } else {
+    chrome.tabs.create({ url: targetUrl });
+  }
 });
 
 document.getElementById('openAntigravityBtn').addEventListener('click', () => {

@@ -1,5 +1,5 @@
 /**
- * Background Service Worker for LLM Quota Tracker Real-Time Auto-Sync (v4.0.1 — Zero-Storage Edition)
+ * Background Service Worker for LLM Quota Tracker Real-Time Auto-Sync (v4.0.2 — Zero-Storage Edition)
  *
  * Security & Privacy Guarantee:
  * 1. Direct In-Browser Bridge: Extracted usage text is broadcast directly to open Dashboard tabs
@@ -127,7 +127,7 @@ async function extractIsolatedUsageFromTab(tryOpenAntigravityPopover = false) {
 
     // 1. If this tab is the LLM Quota Tracker Dashboard (Vercel or localhost:3456)
     if (isMarkedDashboard || ((host === 'localhost' || host === '127.0.0.1') && port === '3456')) {
-      document.documentElement.setAttribute('data-quota-ext', '4.0.1');
+      document.documentElement.setAttribute('data-quota-ext', '4.0.2');
       const syncReq = document.documentElement.getAttribute('data-quota-sync-request');
       const openReq = document.documentElement.getAttribute('data-quota-open-provider');
       if (syncReq) document.documentElement.removeAttribute('data-quota-sync-request');

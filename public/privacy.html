@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Privacy Policy — AI Quota Tracker & LLM Quota Auto-Sync</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0f1117] text-[#e6e8ef] min-h-screen antialiased">
+  <main class="max-w-3xl mx-auto px-5 py-10 space-y-6 text-sm leading-relaxed">
+    <div class="flex items-center justify-between border-b border-[#262b38] pb-4">
+      <div>
+        <h1 class="text-xl font-bold">Privacy Policy — Zero Server-Side Storage</h1>
+        <p class="text-xs text-[#8b93a7] mt-1">AI Quota Tracker &amp; LLM Quota Auto-Sync Browser Extension (Open-Source MIT)</p>
+      </div>
+      <a href="/" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+        ← Back to Dashboard
+      </a>
+    </div>
+
+    <section class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 space-y-2">
+      <h2 class="font-semibold text-emerald-400">1. Zero Data Collection &amp; Zero External Uploads</h2>
+      <p class="text-[#c7ccd8]">
+        This extension and web dashboard operate <strong>100% locally inside your browser</strong>.
+        We do <strong>not</strong> operate any backend database, analytics, telemetry, or tracking server, and we never receive, collect, store, sell, or transmit your personal data or AI usage metrics.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-base font-semibold">2. What Data the Extension Reads &amp; How It Works</h2>
+      <ul class="list-disc list-inside space-y-1.5 text-[#c7ccd8]">
+        <li><strong>Visible Quota Percentages Only:</strong> On supported AI provider usage pages (<code>claude.ai</code>, <code>chatgpt.com</code>, <code>openai.com</code>, <code>antigravity.google.com</code>, <code>kimi.com</code>, <code>kimi.ai</code>, <code>moonshot.cn</code>), the extension reads only visible quota usage labels and reset countdowns from the page DOM.</li>
+        <li><strong>Never Reads Secrets or Prompts:</strong> It never reads cookies, session tokens, passwords, API keys, billing details, or chat conversation history.</li>
+        <li><strong>Direct In-Browser Messaging:</strong> Extracted quota text is forwarded directly inside your own browser via <code>chrome.tabs.sendMessage</code> and <code>window.postMessage</code> to your open AI Quota Tracker tab (<code>ai-quota-tracker-ten.vercel.app</code> or optional <code>localhost:3456</code> companion).</li>
+        <li><strong>Local Browser Storage Only:</strong> Quota state is saved solely in your browser's <code>localStorage</code> and <code>chrome.storage.local</code>, which you can wipe anytime using <em>Clear Local Data</em>.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-base font-semibold">3. Chrome Extension Permissions Justification</h2>
+      <ul class="list-disc list-inside space-y-1.5 text-[#c7ccd8]">
+        <li><code>tabs</code> &amp; <code>activeTab</code>: Used to detect which supported AI provider usage tabs are already open so duplicate tabs are not opened, and to focus or sync active provider tabs.</li>
+        <li><code>scripting</code>: Used exclusively on allowlisted AI provider domains and the Dashboard domain to read visible quota bars cleanly inside the page.</li>
+        <li><code>storage</code>: Stores local sync timestamps and temporary quota payloads inside <code>chrome.storage.local</code> across extension service worker wake-ups.</li>
+        <li><code>alarms</code>: Periodically triggers lightweight in-browser tab checks so quota bars stay up to date.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-2 border-t border-[#262b38] pt-4 text-xs text-[#8b93a7]">
+      <p>
+        Source Code &amp; Security Policy:
+        <a href="https://github.com/mumiman/ai-quota-tracker" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">
+          github.com/mumiman/ai-quota-tracker
+        </a>
+      </p>
+      <p>Last updated: November 2026</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /**
- * Zero-Click Real-Time Content Script for LLM Quota Tracker (v4.0.1 — Zero-Storage Edition)
+ * Zero-Click Real-Time Content Script for LLM Quota Tracker (v4.0.2 — Zero-Storage Edition)
  *
  * Security & Privacy Guarantee:
  * - Never reads cookies, tokens, API keys, or chat messages.
@@ -7,7 +7,7 @@
  *   via in-browser `chrome.runtime` + `window.postMessage` — zero external server storage.
  */
 (function () {
-  const EXT_VERSION = '4.0.1';
+  const EXT_VERSION = '4.0.2';
   const host = window.location.hostname || '';
   const port = window.location.port || '';
   let debounceTimer = null;

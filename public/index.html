@@ -787,17 +787,17 @@
         return;
       }
 
-      // Fallback when user still has older v4.0.0 extension loaded (before v4.0.1 smart tab check)
+      // Fallback when user still has older v4.0.0 extension loaded (before smart tab check)
       if (providerId === 'all') {
         showMainSyncBanner(
           `<div class="flex flex-wrap items-center justify-between gap-2">` +
-          `<div><strong>⚠ Extension ของคุณยังเป็น v${escapeHtml(extVer)} — กรุณาอัปเดตเป็น v4.0.1 เพื่อให้เช็ก Tab ที่เปิดอยู่แล้วอัตโนมัติ (ไม่เปิดซ้ำ):</strong><br/>` +
+          `<div><strong>⚠ Extension ของคุณยังเป็น v${escapeHtml(extVer)} — กรุณาอัปเดตเป็น v4.0.2 เพื่อให้เช็ก Tab ที่เปิดอยู่แล้วอัตโนมัติ (ไม่เปิดซ้ำ):</strong><br/>` +
           `ดาวน์โหลดไฟล์ใหม่ แตกไฟล์ทับโฟลเดอร์เดิม แล้วกดปุ่ม <strong>Reload (↻)</strong> ใน <code>brave://extensions</code> แล้ว Refresh หน้านี้</div>` +
-          `<a href="/ai-quota-tracker-extension-v4.0.zip" download class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0 transition">⬇ Download Extension v4.0.1 (.zip)</a>` +
+          `<a href="/ai-quota-tracker-extension-v4.0.zip" download class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0 transition">⬇ Download Extension v4.0.2 (.zip)</a>` +
           `</div>`,
           'amber'
         );
-        renderSyncStatusBox('Please update Extension to v4.0.1 for smart tab detection');
+        renderSyncStatusBox('Please update Extension to v4.0.2 for smart tab detection');
       } else if (urls[providerId]) {
         window.open(urls[providerId], '_blank', 'noopener,noreferrer');
         renderSyncStatusBox(`Opening ${labelMap[providerId] || providerId}...`);

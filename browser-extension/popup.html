@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <style>
     body {
-      width: 310px;
+      width: 348px;
       margin: 0;
       padding: 12px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -53,16 +53,26 @@
       color: white;
       font-weight: 600;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    button.dashboard-primary {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-color: #34d399;
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.28);
+      font-size: 11.5px;
     }
     button.secondary { background: #1f2430; color: #e6e8ef; }
-    button:hover { opacity: 0.9; }
+    button:hover { opacity: 0.92; }
     #status { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #0f1117; display: none; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h3>LLM Quota Auto-Sync v4.0</h3>
+    <h3>LLM Quota Auto-Sync v4.0.2</h3>
     <span class="badge">🔒 ZERO-STORAGE</span>
   </div>
   <p>Syncs open Claude, ChatGPT/Codex, Kimi.ai, and Antigravity tabs directly inside your browser (100% private).</p>
@@ -74,8 +84,8 @@
     <div class="status-item"><span>Kimi.ai</span><span id="st_kimi" style="color:#8b93a7">Waiting for tab...</span></div>
   </div>
 
+  <button id="openDashboardBtn" class="dashboard-primary">🚀 Open Dashboard (ai-quota-tracker-ten.vercel.app) ↗</button>
   <button id="syncAllBtn">⚡ Force Sync All Open Tabs</button>
-  <button id="openDashboardBtn" class="secondary">Open Dashboard ↗</button>
   <button id="openAntigravityBtn" class="secondary">Open Antigravity Models & Usage ↗</button>
   <button id="openClaudeBtn" class="secondary">Open Claude Usage Page ↗</button>
   <button id="openCodexBtn" class="secondary">Open Codex Usage Page ↗</button>
