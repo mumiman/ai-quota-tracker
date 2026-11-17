@@ -23,26 +23,46 @@
     document.documentElement.setAttribute('data-quota-ext', EXT_VERSION);
     window.postMessage({ type: 'QUOTA_TRACKER_EXT_READY', version: EXT_VERSION }, window.location.origin);
 
-    // Receive direct in-browser usage payloads from background.js and forward to Dashboard window
-    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-      if (msg?.type === 'QUOTA_DIRECT_USAGE_PUSH') {
-        document.documentElement.setAttribute('data-quota-ext', EXT_VERSION);
-        window.postMessage({
-          type: 'QUOTA_TRACKER_DIRECT_USAGE',
-          version: EXT_VERSION,
-          payload: msg.payload
-        }, window.location.origin);
-        sendResponse({ ok: true });
-      }
-      if (msg?.type === 'QUOTA_DIRECT_BULK_PUSH' && Array.isArray(msg.items)) {
-        document.documentElement.setAttribute('data-quota-ext', EXT_VERSION);
-        for (const item of msg.items) {
+    function pushPayloadsToPage(items) {
+      if (!Array.isArray(items)) return;
+      for (const item of items) {
+        if (item && item.providerId && item.rawText) {
           window.postMessage({
             type: 'QUOTA_TRACKER_DIRECT_USAGE',
             version: EXT_VERSION,
             payload: item
           }, window.location.origin);
         }
+      }
+    }
+
+    // Hydrate immediately from chrome.storage.local in case Service Worker already scanned tabs while Dashboard was closed/sleeping
+    try {
+      chrome.storage.local.get(['latestPayloadsMap'], (res) => {
+        void chrome.runtime.lastError;
+        if (res?.latestPayloadsMap) {
+          pushPayloadsToPage(Object.values(res.latestPayloadsMap));
+        }
+      });
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes.latestPayloadsMap?.newValue) {
+          pushPayloadsToPage(Object.values(changes.latestPayloadsMap.newValue));
+        }
+      });
+    } catch {
+      // Ignore if storage API unavailable
+    }
+
+    // Receive direct in-browser usage payloads from background.js and forward to Dashboard window
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (msg?.type === 'QUOTA_DIRECT_USAGE_PUSH') {
+        document.documentElement.setAttribute('data-quota-ext', EXT_VERSION);
+        pushPayloadsToPage([msg.payload]);
+        sendResponse({ ok: true });
+      }
+      if (msg?.type === 'QUOTA_DIRECT_BULK_PUSH' && Array.isArray(msg.items)) {
+        document.documentElement.setAttribute('data-quota-ext', EXT_VERSION);
+        pushPayloadsToPage(msg.items);
         sendResponse({ ok: true });
       }
     });
@@ -56,15 +76,7 @@
 
       chrome.runtime.sendMessage({ type: 'POLL_ALL_TABS_NOW' }, (resp) => {
         void chrome.runtime.lastError;
-        if (resp?.items && Array.isArray(resp.items)) {
-          for (const item of resp.items) {
-            window.postMessage({
-              type: 'QUOTA_TRACKER_DIRECT_USAGE',
-              version: EXT_VERSION,
-              payload: item
-            }, window.location.origin);
-          }
-        }
+        if (resp?.items) pushPayloadsToPage(resp.items);
         if (resp?.ok) {
           window.postMessage({ type: 'QUOTA_TRACKER_SYNC_DONE', syncedCount: resp.syncedCount || 0 }, window.location.origin);
         }

@@ -374,8 +374,18 @@
     }
 
     if (providerId === 'codex') {
-      const lastHeaderIdx = text.lastIndexOf('5-hour limit');
-      const scope = lastHeaderIdx >= 0 ? text.slice(Math.max(0, lastHeaderIdx - 40), lastHeaderIdx + 1200) : text;
+      const planLimitsIdx = text.lastIndexOf('Plan limits');
+      const searchStart = planLimitsIdx >= 0 ? planLimitsIdx : 0;
+      const resetsSectionIdx = text.indexOf('Usage limit resets', searchStart);
+      const regionEnd = resetsSectionIdx > searchStart ? resetsSectionIdx : text.length;
+      const planRegion = text.slice(searchStart, regionEnd);
+
+      // Find the "5-hour limit" occurrence inside planRegion (ignoring "restore your 5-hour limit" under Usage limit resets)
+      const fiveHourMatches = [...planRegion.matchAll(/5-hour limit/gi)];
+      const anchorMatch = fiveHourMatches.length > 0 ? fiveHourMatches[fiveHourMatches.length - 1] : null;
+      const scope = anchorMatch
+        ? planRegion.slice(Math.max(0, anchorMatch.index - 40), anchorMatch.index + 1200)
+        : planRegion;
       const weeklyIdx = scope.search(/Weekly limit/i);
 
       const ticketMatches = [...text.matchAll(/(Full reset[^\n]*)\s*\n+\s*(Expires [^\n]+)/gi)];
@@ -387,7 +397,7 @@
           }))
         : null;
 
-      if (weeklyIdx >= 0 && lastHeaderIdx >= 0) {
+      if (weeklyIdx >= 0 && anchorMatch) {
         const fiveHSec = scope.slice(0, weeklyIdx);
         const weekSec = scope.slice(weeklyIdx);
         const sLeft = fiveHSec.match(/(\d{1,3})%\s*left/i);

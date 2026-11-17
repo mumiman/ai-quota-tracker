@@ -642,3 +642,37 @@ test('GET /js/quota-core.js serves client-side zero-storage engine with nosniff 
   const js = await res.text();
   assert.match(js, /QuotaCore/);
 });
+
+test('Codex parser ignores "Use a reset to restore your 5-hour limit, weekly limit, or both" and extracts 67% left / 36% left', () => {
+  const QuotaCore = require('../public/js/quota-core');
+  const exactChatGptOverviewText = `
+    Usage
+    Track your usage and check your limits
+    Overview Analytics
+    Your plan
+    ChatGPT Plus
+    $20 / month
+    Plan limits
+    Shared across Codex, Work, Workspace Agents, and ChatGPT for Excel.
+    5-hour limit
+    Resets in 1h 46m
+    67% left
+    Weekly limit
+    Resets in 1d 19h
+    36% left
+    Usage limit resets
+    Use a reset to restore your 5-hour limit, weekly limit, or both
+    Available 3 History
+    Full reset (Weekly + 5 hr)
+    Expires Dec 1, 2:22 AM GMT+7
+    Full reset (Weekly + 5 hr)
+    Expires Dec 2, 4:04 AM GMT+7
+  `;
+  const parsed = QuotaCore.parseUsagePageText('codex', exactChatGptOverviewText);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.sessionUsedPct, 33);
+  assert.equal(parsed.sessionResetText, 'Resets in 1h 46m');
+  assert.equal(parsed.weeklyUsedPct, 64);
+  assert.equal(parsed.weeklyResetText, 'Resets in 1d 19h');
+  assert.equal(parsed.resetsAvailable.length, 2);
+});

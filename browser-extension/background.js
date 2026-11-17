@@ -334,11 +334,19 @@ async function broadcastUsageToDashboardsAndLocal({ providerId, rawText, interna
   };
   latestExtractedPayloads[providerId] = payload;
 
+  // Persist latest payload in chrome.storage.local so Dashboard tabs can always hydrate even after SW sleep
+  try {
+    const store = await chrome.storage.local.get(['latestPayloadsMap']);
+    const map = store.latestPayloadsMap || {};
+    map[providerId] = payload;
+    await chrome.storage.local.set({ latestPayloadsMap: map });
+  } catch {
+    // ignore storage quota errors
+  }
+
   if (!force && lastPushedSignatures[providerId] === sig) {
     return { ok: true, cached: true, payload };
   }
-
-  lastPushedSignatures[providerId] = sig;
 
   let hostLabel = 'browser tab';
   try { hostLabel = new URL(pageUrl).hostname; } catch {}
@@ -369,7 +377,7 @@ async function broadcastUsageToDashboardsAndLocal({ providerId, rawText, interna
     // ignore
   }
 
-  // 2. Also attempt optional local companion sync on localhost:3456 (never sends over internet)
+  // Only cache signature after delivery succeeded (or local server accepted) so a sleeping tab doesn't drop updates
   let deliveredToLocalServer = false;
   try {
     const res = await fetch(`${LOCAL_TRACKER_BASE}/api/accounts/parse-usage`, {
@@ -388,6 +396,10 @@ async function broadcastUsageToDashboardsAndLocal({ providerId, rawText, interna
     }
   } catch {
     // Normal when using Vercel Cloud Dashboard without local server running
+  }
+
+  if (deliveredToBrowserTab || deliveredToLocalServer) {
+    lastPushedSignatures[providerId] = sig;
   }
 
   await recordSyncStatus(
