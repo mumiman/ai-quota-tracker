@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Quota Tracker Real-Time Auto-Sync",
+  "version": "4.0.0",
+  "description": "Zero-retention, privacy-first real-time quota sync for Antigravity, Claude, ChatGPT/Codex, and Kimi.ai — syncs directly in your browser (Vercel & Localhost).",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "alarms",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://*.openai.com/*",
+    "https://antigravity.google.com/*",
+    "https://*.kimi.com/*",
+    "https://*.kimi.ai/*",
+    "https://*.moonshot.cn/*",
+    "https://*.vercel.app/*",
+    "http://localhost:3456/*",
+    "http://127.0.0.1:3456/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LLM Quota Auto-Sync (v4.0 Zero-Storage)"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://*.openai.com/*",
+        "https://antigravity.google.com/*",
+        "https://*.kimi.com/*",
+        "https://*.kimi.ai/*",
+        "https://*.moonshot.cn/*",
+        "https://*.vercel.app/*",
+        "http://localhost:3456/*",
+        "http://127.0.0.1:3456/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ]
+}

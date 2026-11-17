@@ -1,0 +1,34 @@
+name: CI & Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Automated Test Suite & Zero-Secret Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify no data/ files or secret keys are tracked in git
+        run: |
+          if git ls-files | grep -E '^data/'; then
+            echo "Error: Local data/ files must never be committed to git!"
+            exit 1
+          fi
+          if grep -q '<all_urls>' browser-extension/manifest.json; then
+            echo "Error: browser-extension/manifest.json must use scoped host_permissions, not <all_urls>!"
+            exit 1
+          fi
+
+      - name: Run unit & integration test suite
+        run: npm test

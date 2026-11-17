@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en" data-quota-dashboard="true">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <title>AI Quota Tracker & Smart Switcher (Zero-Storage Edition)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/quota-core.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card: #161922;
+      --card-hover: #1c202b;
+      --border: #262b38;
+      --text: #e6e8ef;
+      --muted: #8b93a7;
+    }
+    body.light {
+      --bg: #f5f6fa;
+      --card: #ffffff;
+      --card-hover: #f9fafb;
+      --border: #e2e5ef;
+      --text: #111827;
+      --muted: #6b7280;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+    }
+    .card-interactive:hover {
+      background-color: var(--card-hover);
+    }
+    .border-theme {
+      border-color: var(--border);
+    }
+    .text-muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+  <div class="max-w-6xl mx-auto px-4 py-4 space-y-4">
+    <!-- Top Menu Bar / Privacy & Extension Status Strip -->
+    <div class="card rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-3">
+        <span class="font-semibold tracking-tight flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Menu Bar:
+        </span>
+        <div id="traySummary" class="flex flex-wrap items-center gap-2 font-mono text-xs"></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span id="privacyBadge" class="px-2 py-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-mono" title="Zero Server-Side Data Retention: All quota data lives 100% in your browser">
+          🔒 Zero-Server-Storage
+        </span>
+        <span id="extStatusBadge" onclick="revealExtensionFolder()" class="cursor-pointer px-2 py-1 rounded-md border border-theme text-muted font-mono transition" title="Click for Browser Extension setup instructions">
+          ⚪ Checking Extension...
+        </span>
+        <button onclick="openAccountsModal()" id="connectModalBtn" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition">
+          Sync & Privacy Settings
+        </button>
+        <button onclick="syncNow()" id="syncBtn" class="px-2.5 py-1 rounded-md border border-theme hover:opacity-80 transition">
+          Sync Now
+        </button>
+        <button onclick="toggleTheme()" class="px-2.5 py-1 rounded-md border border-theme hover:opacity-80 transition" id="themeBtn">
+          Light Mode
+        </button>
+        <button onclick="toggleCompactMode()" class="px-2.5 py-1 rounded-md border border-theme hover:opacity-80 transition" id="modeBtn">
+          Tray Mode
+        </button>
+      </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="appShell" class="space-y-4 transition-all duration-300">
+      <!-- Header & Controls -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">AI Quota Tracker & Smart Switcher</h1>
+          <p class="text-xs text-muted">Unified <code class="px-1 py-0.5 rounded bg-black/20">% used</code> tracking for Antigravity, Claude, Codex & Kimi — <span class="text-emerald-400 font-medium">100% Client-Side Privacy (Zero Server Storage)</span>.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <select id="taskSelect" onchange="fetchState()" class="card rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">
+            <option value="deep">Task: Deep Architecture / Refactor</option>
+            <option value="agentic">Task: Multi-File Agentic Workflow</option>
+            <option value="fast">Task: Quick Inline / CLI Script</option>
+          </select>
+          <button onclick="simulatePrompt()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium transition">
+            + Simulate Usage
+          </button>
+          <button onclick="resetDemo()" class="card px-3 py-1.5 rounded-lg hover:opacity-80 transition">
+            Reset Demo
+          </button>
+          <button onclick="clearAllBrowserData()" class="card px-3 py-1.5 rounded-lg text-red-400 border-red-500/30 hover:bg-red-500/10 transition" title="Clear all quota state stored in your browser's localStorage">
+            Clear Local Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Browser Extension Auto-Sync Quick Launch Bar -->
+      <div class="card rounded-xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-blue-400">⚡ Browser Extension Auto-Sync:</span>
+          <span class="text-muted">Open provider usage pages so the Extension syncs live quota % directly inside your browser:</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="openAndSyncProvider('all')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+            🚀 Open All & Auto-Sync
+          </button>
+          <button onclick="openAndSyncProvider('antigravity')" class="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/35 text-blue-400 border border-blue-500/40 font-medium transition">
+            🔵 Antigravity Usage ↗
+          </button>
+          <button onclick="openAndSyncProvider('claude')" class="px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/35 text-amber-400 border border-amber-500/40 font-medium transition">
+            🟠 Claude Usage ↗
+          </button>
+          <button onclick="openAndSyncProvider('codex')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-400 border border-emerald-500/40 font-medium transition">
+            🟢 Codex Usage ↗
+          </button>
+          <button onclick="openAndSyncProvider('kimi')" class="px-2.5 py-1 rounded-lg bg-purple-600/20 hover:bg-purple-600/35 text-purple-400 border border-purple-500/40 font-medium transition">
+            🟣 Kimi.ai ↗
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Sync Feedback Banner on Main Dashboard -->
+      <div id="mainSyncBanner" class="hidden rounded-xl border px-3.5 py-2.5 text-xs"></div>
+
+      <!-- Smart Alerts Banner -->
+      <div id="alertsArea" class="space-y-2"></div>
+
+      <!-- 4 Provider Cards -->
+      <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+      <!-- Click-to-Inspect Reset Detail Panel -->
+      <div id="resetDetailPanel" class="card rounded-xl p-4 space-y-3"></div>
+
+      <!-- Bottom Grid: Smart Auto-Router + Context Handoff / Burn-Rate -->
+      <div id="bottomGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div class="card rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-theme pb-2">
+            <h2 class="text-sm font-semibold">Smart Auto-Router & 1-Click Switch</h2>
+            <span class="text-xs text-muted">Ranked by headroom & task fit</span>
+          </div>
+          <div id="routerContent" class="space-y-2.5 text-xs"></div>
+        </div>
+
+        <div class="card rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-theme pb-2">
+            <h2 class="text-sm font-semibold">Context Handoff & Usage Trend</h2>
+            <div class="flex gap-1 text-xs">
+              <button onclick="setBottomTab('handoff')" id="tabHandoff" class="px-2 py-0.5 rounded bg-blue-600 text-white">Handoff Prompt</button>
+              <button onclick="setBottomTab('trend')" id="tabTrend" class="px-2 py-0.5 rounded border border-theme text-muted">Burn-Rate Chart</button>
+            </div>
+          </div>
+          <div id="bottomTabContent" class="text-xs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync & Privacy Settings Modal -->
+  <div id="accountsModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="card rounded-2xl max-w-2xl w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-theme pb-3">
+        <div>
+          <h2 class="text-base font-bold" id="accountsModalTitle">Browser Sync, Privacy & Data Controls</h2>
+          <p class="text-xs text-muted" id="accountsModalSub">
+            🔒 Zero Server-Side Storage: All usage metrics live exclusively in your browser's <code>localStorage</code>.
+          </p>
+        </div>
+        <button onclick="closeAccountsModal()" class="px-2.5 py-1 rounded border border-theme text-xs hover:opacity-80">Close</button>
+      </div>
+
+      <!-- Privacy & Export/Import Controls -->
+      <div class="p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div>
+          <div class="font-semibold text-emerald-400">🔒 Your Data Never Leaves Your Browser</div>
+          <div class="text-muted">Export your quota snapshot as JSON, import a backup, or wipe all local browser storage anytime.</div>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button onclick="exportLocalStateJson()" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition">
+            ⬇ Export JSON
+          </button>
+          <button onclick="clearAllBrowserData()" class="px-2.5 py-1.5 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/15 font-medium transition">
+            🗑 Clear Browser Data
+          </button>
+        </div>
+      </div>
+
+      <div id="accountsFormArea" class="space-y-3 text-xs"></div>
+
+      <!-- Unified Local Proxy Info (Shown only when running in Local Companion mode) -->
+      <div id="localProxyBox" class="hidden p-3 rounded-xl border border-blue-500/40 bg-blue-500/10 space-y-2 text-xs">
+        <div class="font-semibold text-blue-400">Unified Local Proxy Endpoint (Local Companion Mode Only)</div>
+        <p class="text-muted">Point Cursor, Continue, Cline, or any OpenAI-compatible client to this local URL:</p>
+        <div class="flex items-center gap-2">
+          <code id="proxyUrlCode" class="flex-1 px-2.5 py-1.5 rounded bg-black/30 font-mono"></code>
+          <button id="copyProxyBtn" onclick="copyText(document.getElementById('proxyUrlCode').textContent, 'copyProxyBtn')" class="px-3 py-1.5 rounded bg-blue-600 text-white font-medium">Copy URL</button>
+        </div>
+      </div>
+
+      <div id="syncStatusBox" class="hidden p-3 rounded-xl border border-theme bg-black/20 text-xs space-y-1"></div>
+    </div>
+  </div>
+
+  <!-- Antigravity Usage Popover & Sync Modal -->
+  <div id="antigravityUsageModal" class="hidden fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
+    <div class="card rounded-2xl max-w-xl w-full p-5 space-y-4 max-h-[92vh] overflow-y-auto border border-blue-500/40">
+      <div class="flex items-center justify-between border-b border-theme pb-3">
+        <div>
+          <h2 class="text-base font-bold flex items-center gap-2">
+            <span>🔵 Antigravity — Models & Usage Sync</span>
+          </h2>
+          <p class="text-xs text-muted mt-0.5">
+            ซิงค์โควตา Antigravity จากหน้า <code>antigravity.google.com/remote?settingsOpen=true&settingsScreen=Models</code> หรือปรับค่าด้านล่างโดยตรง (เก็บในเบราว์เซอร์ของคุณ 100%)
+          </p>
+        </div>
+        <button onclick="closeAntigravityUsageModal()" class="px-2.5 py-1 rounded border border-theme text-xs hover:opacity-80">Close</button>
+      </div>
+
+      <!-- Auto-Sync / Clipboard Bar -->
+      <div class="p-3 rounded-xl border border-blue-500/40 bg-blue-500/10 space-y-2 text-xs">
+        <div class="font-semibold text-blue-400">⚡ วิธี Sync โควตา Antigravity:</div>
+        <ol class="list-decimal list-inside space-y-1 text-muted">
+          <li><strong>ผ่าน Browser Extension:</strong> กดปุ่ม <strong>🔵 Antigravity Usage ↗</strong> เพื่อเปิดหน้า Models & Usage แล้ว Extension จะซิงค์เข้าหน้านี้โดยตรง</li>
+          <li><strong>ผ่านการวางข้อความ (Paste):</strong> ก๊อปปี้ข้อความจากหน้า Models & Usage แล้วกดปุ่ม <strong>Paste & Sync</strong> ด้านล่าง</li>
+        </ol>
+        <div class="flex flex-wrap items-center gap-2 pt-1">
+          <button onclick="scanAntigravityNow()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition">
+            🔍 Scan Open Antigravity Tab
+          </button>
+          <button onclick="pasteAntigravityFromClipboard()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+            📋 Paste & Sync from Clipboard
+          </button>
+        </div>
+        <div id="agyModalStatus" class="hidden pt-1 font-medium text-emerald-400"></div>
+      </div>
+
+      <!-- Native Antigravity Usage Popover Mirror -->
+      <div class="p-3.5 rounded-xl border border-theme bg-black/25 space-y-3 text-xs">
+        <div class="flex items-center justify-between border-b border-theme pb-2">
+          <span class="font-semibold text-sm">Usage Popover Mirror (กรอก <code>% left</code> ตามที่เห็นในหน้า Models & Usage)</span>
+          <span class="text-muted font-mono">Auto-converts % left → % used</span>
+        </div>
+
+        <div class="space-y-2">
+          <div class="font-semibold text-blue-400">1. Gemini Models</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="p-2.5 rounded-lg border border-theme bg-black/20 space-y-1">
+              <div class="flex justify-between">
+                <span class="font-medium">Weekly limit (% left)</span>
+                <span id="agy_lbl_gw" class="font-mono text-emerald-400">96% left (4% used)</span>
+              </div>
+              <input id="agy_gw_left" type="number" min="0" max="100" oninput="updateAgyMirrorPreview()" class="w-full card rounded px-2 py-1 font-mono text-sm" />
+              <input id="agy_gw_reset" type="text" placeholder="Resets in 6 days" class="w-full card rounded px-2 py-1 text-muted" />
+            </div>
+            <div class="p-2.5 rounded-lg border border-theme bg-black/20 space-y-1">
+              <div class="flex justify-between">
+                <span class="font-medium">5-hour limit (% left)</span>
+                <span id="agy_lbl_g5" class="font-mono text-emerald-400">100% left (0% used)</span>
+              </div>
+              <input id="agy_g5_left" type="number" min="0" max="100" oninput="updateAgyMirrorPreview()" class="w-full card rounded px-2 py-1 font-mono text-sm" />
+              <input id="agy_g5_reset" type="text" placeholder="100% left (5h limit)" class="w-full card rounded px-2 py-1 text-muted" />
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-theme">
+          <div class="font-semibold text-amber-400">2. Claude and GPT models</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="p-2.5 rounded-lg border border-theme bg-black/20 space-y-1">
+              <div class="flex justify-between">
+                <span class="font-medium">Weekly limit (% left)</span>
+                <span id="agy_lbl_cw" class="font-mono text-emerald-400">22% left (78% used)</span>
+              </div>
+              <input id="agy_cw_left" type="number" min="0" max="100" oninput="updateAgyMirrorPreview()" class="w-full card rounded px-2 py-1 font-mono text-sm" />
+              <input id="agy_cw_reset" type="text" placeholder="Resets in 16 hours, 58 minutes" class="w-full card rounded px-2 py-1 text-muted" />
+            </div>
+            <div class="p-2.5 rounded-lg border border-theme bg-black/20 space-y-1">
+              <div class="flex justify-between">
+                <span class="font-medium">5-hour limit (% left)</span>
+                <span id="agy_lbl_c5" class="font-mono text-emerald-400">100% left (0% used)</span>
+              </div>
+              <input id="agy_c5_left" type="number" min="0" max="100" oninput="updateAgyMirrorPreview()" class="w-full card rounded px-2 py-1 font-mono text-sm" />
+              <input id="agy_c5_reset" type="text" placeholder="100% left (5h limit)" class="w-full card rounded px-2 py-1 text-muted" />
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-theme">
+          <div class="font-semibold text-purple-400">3. Gemini 4 Argon</div>
+          <div class="p-2.5 rounded-lg border border-theme bg-black/20 space-y-1">
+            <div class="flex justify-between">
+              <span class="font-medium">Weekly limit (% left)</span>
+              <span id="agy_lbl_aw" class="font-mono text-emerald-400">30% left (70% used)</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input id="agy_aw_left" type="number" min="0" max="100" oninput="updateAgyMirrorPreview()" class="w-full card rounded px-2 py-1 font-mono text-sm" />
+              <input id="agy_aw_reset" type="text" placeholder="Resets in 6 days" class="w-full card rounded px-2 py-1 text-muted" />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-theme">
+          <button onclick="saveAntigravityMirror()" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition">
+            ✓ Save & Sync Antigravity Usage
+          </button>
+        </div>
+      </div>
+
+      <details class="text-xs border-t border-theme pt-2">
+        <summary class="cursor-pointer text-muted hover:text-white select-none">หรือวางข้อความที่ก๊อปปี้มาจากหน้า Models & Usage ของ Antigravity โดยตรง</summary>
+        <div class="mt-2 flex gap-2 items-start">
+          <textarea id="agy_modal_paste" rows="3" placeholder="วางข้อความจากหน้า Models & Usage ของ Antigravity (Gemini Models ... Claude and GPT models ... Gemini 4 Argon)" class="flex-1 card rounded-lg px-2.5 py-1.5 text-xs"></textarea>
+          <button onclick="parseAntigravityModalText()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium shrink-0 transition">
+            Sync Text
+          </button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    const LS_STATE_KEY = 'ai_quota_tracker_state_v1';
+    const LS_ACCOUNTS_KEY = 'ai_quota_tracker_accounts_v1';
+    const IS_LOCAL_COMPANION = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '3456';
+
+    let appState = null;
+    let appRouting = null;
+    let appAccounts = null;
+    let selectedProvider = 'codex';
+    let codexResetTab = 'available';
+    let bottomTab = 'handoff';
+    let compactMode = false;
+    let handoffOutput = '';
+
+    /**
+     * Strict XSS sanitization helper for all strings rendered into HTML.
+     */
+    function escapeHtml(val) {
+      return String(val ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function loadLocalBrowserData() {
+      let state = null;
+      let accounts = null;
+      try {
+        const rawState = localStorage.getItem(LS_STATE_KEY);
+        if (rawState) state = JSON.parse(rawState);
+      } catch {}
+      try {
+        const rawAcc = localStorage.getItem(LS_ACCOUNTS_KEY);
+        if (rawAcc) accounts = JSON.parse(rawAcc);
+      } catch {}
+
+      if (!state || !state.providers) {
+        state = window.QuotaCore.getInitialState();
+        saveLocalBrowserState(state);
+      }
+      if (!accounts || !accounts.providers) {
+        accounts = window.QuotaCore.getDefaultAccounts();
+        saveLocalBrowserAccounts(accounts);
+      }
+      return { state, accounts };
+    }
+
+    function saveLocalBrowserState(state) {
+      try {
+        localStorage.setItem(LS_STATE_KEY, JSON.stringify(state));
+      } catch {}
+      return state;
+    }
+
+    function saveLocalBrowserAccounts(accounts) {
+      try {
+        localStorage.setItem(LS_ACCOUNTS_KEY, JSON.stringify(accounts));
+      } catch {}
+      return accounts;
+    }
+
+    function clearAllBrowserData() {
+      try {
+        localStorage.removeItem(LS_STATE_KEY);
+        localStorage.removeItem(LS_ACCOUNTS_KEY);
+      } catch {}
+      const { state, accounts } = loadLocalBrowserData();
+      appState = state;
+      appAccounts = accounts;
+      const taskType = document.getElementById('taskSelect')?.value || 'deep';
+      appRouting = window.QuotaCore.evaluateRoutes(appState, taskType);
+      render();
+      showMainSyncBanner('<strong>🔒 ล้างข้อมูลในเบราว์เซอร์เรียบร้อยแล้ว:</strong> รีเซ็ตกลับสู่ค่าเริ่มต้นใน <code>localStorage</code> โดยไม่มีข้อมูลใดๆ ค้างอยู่', 'emerald');
+    }
+
+    function exportLocalStateJson() {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        state: appState,
+        accounts: appAccounts
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-quota-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function getBarColor(usedPct) {
+      if (usedPct >= 75) return '#ef4444';
+      if (usedPct >= 50) return '#f59e0b';
+      return '#3b82f6';
+    }
+
+    function getTextColorClass(usedPct) {
+      if (usedPct >= 75) return 'text-red-500 font-semibold';
+      if (usedPct >= 50) return 'text-amber-500 font-medium';
+      return 'text-muted';
+    }
+
+    function renderBarRow({ label, subtitle, usedPct, resetText }) {
+      const safePct = Math.min(100, Math.max(0, Number(usedPct) || 0));
+      const color = getBarColor(safePct);
+      const textCls = getTextColorClass(safePct);
+      const widthPct = safePct > 0 ? Math.max(3, Math.min(100, safePct)) : 0;
+      return `
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-xs gap-2">
+            <span class="font-medium truncate">${escapeHtml(label)}</span>
+            <span class="font-mono tabular-nums shrink-0 ${textCls}">${safePct}% used</span>
+          </div>
+          ${subtitle ? `<div class="text-xs text-muted">${escapeHtml(subtitle)}</div>` : ''}
+          <div class="w-full h-2 rounded-full bg-black/25 overflow-hidden border border-theme">
+            <div class="h-full rounded-full transition-all duration-300" style="width: ${widthPct}%; background-color: ${color};"></div>
+          </div>
+          <div class="text-xs text-muted">${escapeHtml(resetText)}</div>
+        </div>
+      `;
+    }
+
+    async function fetchState() {
+      const taskType = document.getElementById('taskSelect')?.value || 'deep';
+      if (IS_LOCAL_COMPANION) {
+        try {
+          const res = await fetch(`/api/state?taskType=${encodeURIComponent(taskType)}`);
+          if (res.ok) {
+            const data = await res.json();
+            appState = saveLocalBrowserState(data.state);
+            appRouting = data.routing;
+            appAccounts = saveLocalBrowserAccounts(data.accounts);
+            render();
+            return;
+          }
+        } catch {
+          // Fallback to 100% client-side localStorage
+        }
+      }
+
+      const { state, accounts } = loadLocalBrowserData();
+      state.taskType = taskType;
+      appState = state;
+      appAccounts = accounts;
+      appRouting = window.QuotaCore.evaluateRoutes(appState, taskType);
+      render();
+    }
+
+    /**
+     * Handles direct in-browser usage sync sent from the Browser Extension (Zero Server Network I/O!).
+     */
+    function applyDirectExtensionSync(payload) {
+      if (!payload || !payload.providerId || !payload.rawText) return false;
+      const parsed = window.QuotaCore.parseUsagePageText(payload.providerId, payload.rawText);
+      if (!parsed || !parsed.ok) return false;
+
+      if (!appState || !appAccounts) {
+        const loaded = loadLocalBrowserData();
+        appState = loaded.state;
+        appAccounts = loaded.accounts;
+      }
+
+      window.QuotaCore.applyParsedUsageToState(
+        payload.providerId,
+        parsed,
+        {
+          accountLabel: payload.accountLabel || 'Browser Extension Auto-Sync',
+          pageUrl: payload.pageUrl
+        },
+        appState,
+        appAccounts
+      );
+      window.QuotaCore.appendHistorySnapshot(appState);
+      saveLocalBrowserState(appState);
+      saveLocalBrowserAccounts(appAccounts);
+
+      const taskType = document.getElementById('taskSelect')?.value || appState.taskType || 'deep';
+      appRouting = window.QuotaCore.evaluateRoutes(appState, taskType);
+      render();
+      return true;
+    }
+
+    function renderSyncStatusBox(headerLabel) {
+      const box = document.getElementById('syncStatusBox');
+      if (!box || !appAccounts) return;
+      box.classList.remove('hidden');
+      const rows = [
+        { id: 'antigravity', name: 'Antigravity', btn: 'Open Antigravity Usage ↗', cls: 'bg-blue-600 hover:bg-blue-500' },
+        { id: 'claude', name: 'Claude', btn: 'Open Claude Usage ↗', cls: 'bg-amber-600 hover:bg-amber-500' },
+        { id: 'codex', name: 'Codex', btn: 'Open Codex Usage ↗', cls: 'bg-emerald-600 hover:bg-emerald-500' },
+        { id: 'kimi', name: 'Kimi', btn: 'Open Kimi.ai ↗', cls: 'bg-purple-600 hover:bg-purple-500' }
+      ];
+      box.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-theme">
+          <span class="font-semibold text-emerald-400">${escapeHtml(headerLabel)}</span>
+          <button onclick="openAndSyncProvider('all')" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+            🚀 Open All Web Tabs & Auto-Sync
+          </button>
+        </div>
+        <div class="space-y-1.5 pt-1">
+          ${rows.map(r => {
+            const p = appAccounts.providers[r.id];
+            if (!p) return '';
+            return `
+              <div class="flex flex-wrap items-center justify-between gap-2 py-0.5">
+                <span class="truncate">• <strong>${escapeHtml(r.name)}:</strong> ${escapeHtml(p.lastStatus)}</span>
+                <button onclick="openAndSyncProvider('${r.id}')" class="px-2 py-0.5 rounded ${r.cls} text-white font-medium shrink-0 transition">
+                  ${escapeHtml(r.btn)}
+                </button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function openAntigravityUsageModal() {
+      if (!appState?.providers?.antigravity) return;
+      const agy = appState.providers.antigravity;
+      const g5Used = agy.groups[0]?.items[0]?.usedPct ?? 0;
+      const gwUsed = agy.groups[0]?.items[1]?.usedPct ?? 0;
+      const c5Used = agy.groups[1]?.items[0]?.usedPct ?? 0;
+      const cwUsed = agy.groups[1]?.items[1]?.usedPct ?? 0;
+      const awUsed = agy.groups[2]?.items[0]?.usedPct ?? 0;
+
+      document.getElementById('agy_gw_left').value = Math.max(0, 100 - gwUsed);
+      document.getElementById('agy_gw_reset').value = agy.groups[0]?.items[1]?.resetText || 'Resets in 6 days';
+      document.getElementById('agy_g5_left').value = Math.max(0, 100 - g5Used);
+      document.getElementById('agy_g5_reset').value = agy.groups[0]?.items[0]?.resetText || '100% left (5h limit)';
+
+      document.getElementById('agy_cw_left').value = Math.max(0, 100 - cwUsed);
+      document.getElementById('agy_cw_reset').value = agy.groups[1]?.items[1]?.resetText || 'Resets in 16 hours, 58 minutes';
+      document.getElementById('agy_c5_left').value = Math.max(0, 100 - c5Used);
+      document.getElementById('agy_c5_reset').value = agy.groups[1]?.items[0]?.resetText || '100% left (5h limit)';
+
+      document.getElementById('agy_aw_left').value = Math.max(0, 100 - awUsed);
+      document.getElementById('agy_aw_reset').value = agy.groups[2]?.items[0]?.resetText || 'Resets in 6 days';
+
+      updateAgyMirrorPreview();
+      document.getElementById('antigravityUsageModal').classList.remove('hidden');
+    }
+
+    function closeAntigravityUsageModal() {
+      document.getElementById('antigravityUsageModal').classList.add('hidden');
+    }
+
+    function updateAgyMirrorPreview() {
+      const pairs = [
+        ['agy_gw_left', 'agy_lbl_gw'],
+        ['agy_g5_left', 'agy_lbl_g5'],
+        ['agy_cw_left', 'agy_lbl_cw'],
+        ['agy_c5_left', 'agy_lbl_c5'],
+        ['agy_aw_left', 'agy_lbl_aw']
+      ];
+      for (const [inId, lblId] of pairs) {
+        const left = Math.min(100, Math.max(0, Number(document.getElementById(inId)?.value || 0)));
+        const used = 100 - left;
+        const el = document.getElementById(lblId);
+        if (el) el.textContent = `${left}% left (${used}% used)`;
+      }
+    }
+
+    async function saveAntigravityMirror() {
+      const gwLeft = Math.min(100, Math.max(0, Number(document.getElementById('agy_gw_left').value || 0)));
+      const g5Left = Math.min(100, Math.max(0, Number(document.getElementById('agy_g5_left').value || 0)));
+      const cwLeft = Math.min(100, Math.max(0, Number(document.getElementById('agy_cw_left').value || 0)));
+      const c5Left = Math.min(100, Math.max(0, Number(document.getElementById('agy_c5_left').value || 0)));
+      const awLeft = Math.min(100, Math.max(0, Number(document.getElementById('agy_aw_left').value || 0)));
+
+      const antigravityMetrics = {
+        geminiWeeklyUsedPct: 100 - gwLeft,
+        gemini5hUsedPct: 100 - g5Left,
+        claudeGptWeeklyUsedPct: 100 - cwLeft,
+        claudeGpt5hUsedPct: 100 - c5Left,
+        argonWeeklyUsedPct: 100 - awLeft,
+        geminiWeeklyResetText: document.getElementById('agy_gw_reset').value.trim() || 'Resets in 6 days',
+        gemini5hResetText: document.getElementById('agy_g5_reset').value.trim() || '100% left (5h limit)',
+        claudeGptWeeklyResetText: document.getElementById('agy_cw_reset').value.trim() || 'Resets in 16 hours, 58 minutes',
+        claudeGpt5hResetText: document.getElementById('agy_c5_reset').value.trim() || '100% left (5h limit)',
+        argonWeeklyResetText: document.getElementById('agy_aw_reset').value.trim() || 'Resets in 6 days'
+      };
+
+      // 1. Update client-side localStorage state immediately
+      window.QuotaCore.applyParsedUsageToState(
+        'antigravity',
+        antigravityMetrics,
+        { accountLabel: 'Antigravity Usage Popover' },
+        appState,
+        appAccounts
+      );
+      window.QuotaCore.appendHistorySnapshot(appState);
+      saveLocalBrowserState(appState);
+      saveLocalBrowserAccounts(appAccounts);
+      appRouting = window.QuotaCore.evaluateRoutes(appState, document.getElementById('taskSelect')?.value || 'deep');
+
+      // 2. If running in Local Companion mode, also sync local server
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/accounts/session-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              providerId: 'antigravity',
+              accountLabel: 'Antigravity Usage Popover',
+              antigravityMetrics
+            })
+          });
+        } catch {}
+      }
+
+      render();
+      showMainSyncBanner('<strong>✓ Synced Antigravity Usage!</strong> อัปเดตโควตา Antigravity ทั้ง 3 กลุ่มลงในเบราว์เซอร์เรียบร้อยแล้ว', 'emerald');
+      closeAntigravityUsageModal();
+    }
+
+    async function scanAntigravityNow() {
+      const statusEl = document.getElementById('agyModalStatus');
+      if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.textContent = 'กำลังสแกนหาแท็บ Antigravity...';
+      }
+      document.documentElement.setAttribute('data-quota-open-provider', 'antigravity');
+      document.documentElement.setAttribute('data-quota-sync-request', String(Date.now()));
+      window.postMessage({ type: 'QUOTA_TRACKER_OPEN_PROVIDER', providerId: 'antigravity' }, window.location.origin);
+      window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+      await syncNow();
+      openAntigravityUsageModal();
+      if (statusEl) {
+        statusEl.textContent = '✓ สแกนเสร็จสิ้น!';
+      }
+    }
+
+    async function pasteAntigravityFromClipboard() {
+      try {
+        const clipText = await navigator.clipboard.readText();
+        if (clipText && clipText.trim()) {
+          document.getElementById('agy_modal_paste').value = clipText;
+          await parseAntigravityModalText();
+          return;
+        }
+      } catch {}
+      await syncNow();
+      openAntigravityUsageModal();
+    }
+
+    async function parseAntigravityModalText() {
+      const rawText = document.getElementById('agy_modal_paste')?.value || '';
+      if (!rawText.trim()) return alert('กรุณาวางข้อความที่ก๊อปปี้มาจากหน้า Models & Usage ของ Antigravity ก่อนครับ');
+      const parsed = window.QuotaCore.parseUsagePageText('antigravity', rawText);
+      if (!parsed.ok) return alert('ไม่พบตัวเลขโควตา (% left / Models & Usage) ในข้อความที่วาง');
+
+      window.QuotaCore.applyParsedUsageToState('antigravity', parsed, { accountLabel: 'Antigravity Usage Popover' }, appState, appAccounts);
+      window.QuotaCore.appendHistorySnapshot(appState);
+      saveLocalBrowserState(appState);
+      saveLocalBrowserAccounts(appAccounts);
+      appRouting = window.QuotaCore.evaluateRoutes(appState, document.getElementById('taskSelect')?.value || 'deep');
+
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/accounts/parse-usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: 'antigravity', rawText, accountLabel: 'Antigravity Usage Popover' })
+          });
+        } catch {}
+      }
+
+      render();
+      showMainSyncBanner('<strong>✓ Synced Antigravity Usage from pasted text!</strong>', 'emerald');
+      closeAntigravityUsageModal();
+    }
+
+    async function openAndSyncProvider(providerId) {
+      const urls = {
+        antigravity: 'https://antigravity.google.com/remote?settingsOpen=true&settingsScreen=Models',
+        claude: 'https://claude.ai/settings/usage',
+        codex: 'https://chatgpt.com/settings/usage?tab=overview',
+        kimi: 'https://www.kimi.com/'
+      };
+
+      document.documentElement.setAttribute('data-quota-open-provider', providerId);
+      document.documentElement.setAttribute('data-quota-sync-request', String(Date.now()));
+      window.postMessage({ type: 'QUOTA_TRACKER_OPEN_PROVIDER', providerId }, window.location.origin);
+      window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+
+      if (providerId === 'all') {
+        window.open(urls.antigravity, '_blank', 'noopener,noreferrer');
+        window.open(urls.claude, '_blank', 'noopener,noreferrer');
+        window.open(urls.codex, '_blank', 'noopener,noreferrer');
+        window.open(urls.kimi, '_blank', 'noopener,noreferrer');
+      } else if (urls[providerId]) {
+        window.open(urls[providerId], '_blank', 'noopener,noreferrer');
+      }
+
+      renderSyncStatusBox(`Opening ${providerId === 'all' ? 'All Providers' : providerId} & waiting for Auto-Sync...`);
+
+      setTimeout(() => fetchState(), 1200);
+      setTimeout(() => fetchState(), 3000);
+      setTimeout(() => fetchState(), 5500);
+    }
+
+    function showMainSyncBanner(html, tone = 'emerald') {
+      const el = document.getElementById('mainSyncBanner');
+      if (!el) return;
+      el.classList.remove('hidden');
+      const clsMap = {
+        emerald: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+        amber: 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+      };
+      el.className = `rounded-xl border px-3.5 py-2.5 text-xs ${clsMap[tone] || clsMap.emerald}`;
+      el.innerHTML = html;
+    }
+
+    function isExtensionVersionOutdated(ver) {
+      if (!ver) return true;
+      const parts = String(ver).split('.').map(n => Number(n) || 0);
+      const minParts = [3, 6, 0];
+      for (let i = 0; i < 3; i++) {
+        if ((parts[i] || 0) < minParts[i]) return true;
+        if ((parts[i] || 0) > minParts[i]) return false;
+      }
+      return false;
+    }
+
+    async function syncNow() {
+      const btn = document.getElementById('syncBtn');
+      btn.textContent = 'Syncing Tabs...';
+      btn.disabled = true;
+      try {
+        const extPromise = new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve({ timedOut: true });
+          }, 1200);
+          function onMsg(ev) {
+            if (ev.source === window && ev.data?.type === 'QUOTA_TRACKER_SYNC_DONE') {
+              clearTimeout(timer);
+              window.removeEventListener('message', onMsg);
+              resolve({ timedOut: false, syncedCount: ev.data.syncedCount || 0 });
+            }
+          }
+          window.addEventListener('message', onMsg);
+        });
+
+        document.documentElement.setAttribute('data-quota-sync-request', String(Date.now()));
+        window.postMessage({ type: 'QUOTA_TRACKER_SYNC_NOW' }, window.location.origin);
+        const extResult = await extPromise;
+
+        let macSynced = [];
+        if (IS_LOCAL_COMPANION) {
+          try {
+            const res = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ applyLocalEstimates: true })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              appState = saveLocalBrowserState(data.state);
+              appRouting = data.routing;
+              appAccounts = saveLocalBrowserAccounts(data.accounts);
+              macSynced = data.macTabSync?.syncedProviders || [];
+            }
+          } catch {}
+        }
+
+        const taskType = document.getElementById('taskSelect')?.value || appState.taskType || 'deep';
+        appRouting = window.QuotaCore.evaluateRoutes(appState, taskType);
+        render();
+
+        const extVer = document.documentElement.getAttribute('data-quota-ext');
+        const timeStr = new Date().toLocaleTimeString();
+
+        if (extVer && !isExtensionVersionOutdated(extVer)) {
+          showMainSyncBanner(`<strong>✓ Synced at ${escapeHtml(timeStr)}</strong> via Browser Extension v${escapeHtml(extVer)} (100% In-Browser Privacy).`, 'emerald');
+          renderSyncStatusBox(`✓ Synced at ${timeStr} via Browser Extension v${extVer}`);
+        } else if (macSynced.length > 0) {
+          showMainSyncBanner(`<strong>✓ Synced at ${escapeHtml(timeStr)}</strong> via Local Companion (${escapeHtml(macSynced.join(', '))}).`, 'emerald');
+          renderSyncStatusBox(`✓ Synced at ${timeStr} via Local Companion`);
+        } else {
+          showMainSyncBanner(
+            `<strong>💡 ติดตั้งหรือ Reload Browser Extension (v4.0):</strong> เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → เปิด <strong>Developer mode</strong> → กด <strong>Load unpacked</strong> เลือกโฟลเดอร์ <code>browser-extension</code> เพื่อซิงค์อัตโนมัติแบบไม่ส่งข้อมูลขึ้นเซิร์ฟเวอร์ หรือวางข้อความ Usage ในปุ่ม <strong>Sync & Privacy Settings</strong> ได้เลยครับ`,
+            'amber'
+          );
+          renderSyncStatusBox(`Checked at ${timeStr} — Install/Reload Browser Extension or Paste Usage Text`);
+        }
+      } finally {
+        btn.textContent = 'Sync Now';
+        btn.disabled = false;
+      }
+    }
+
+    async function saveProviderKey(providerId) {
+      if (!IS_LOCAL_COMPANION) return;
+      const keyInput = document.getElementById(`key_${providerId}`);
+      const urlInput = document.getElementById(`url_${providerId}`);
+      const payload = {
+        providerId,
+        apiKey: keyInput ? keyInput.value : undefined,
+        baseUrl: urlInput ? urlInput.value : undefined
+      };
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      appAccounts = saveLocalBrowserAccounts(data.accounts);
+      await syncNow();
+      renderAccountsForm();
+      render();
+    }
+
+    async function autoDetectAccounts() {
+      if (!IS_LOCAL_COMPANION) return;
+      const btn = document.getElementById('autoDetectBtn');
+      if (btn) { btn.textContent = 'Detecting CLI logins...'; btn.disabled = true; }
+      try {
+        const res = await fetch('/api/accounts/auto-detect', { method: 'POST' });
+        const data = await res.json();
+        appState = saveLocalBrowserState(data.state);
+        appRouting = data.routing;
+        appAccounts = saveLocalBrowserAccounts(data.accounts);
+        renderAccountsForm();
+        render();
+        renderSyncStatusBox('Auto-Detect Completed!');
+      } finally {
+        if (btn) { btn.textContent = '⚡ 1-Click Auto-Detect CLI Logins'; btn.disabled = false; }
+      }
+    }
+
+    async function signInWithProvider(providerId) {
+      await openAndSyncProvider(providerId);
+    }
+
+    async function parseUsageText(providerId) {
+      const rawText = document.getElementById(`paste_${providerId}`)?.value || '';
+      if (!rawText.trim()) return alert('Please paste text from the usage page first (Ctrl+A then Ctrl+C on the usage page).');
+
+      const parsed = window.QuotaCore.parseUsagePageText(providerId, rawText);
+      if (!parsed.ok) {
+        return alert('Could not find usage percentages (% used / % left) in pasted text.');
+      }
+
+      window.QuotaCore.applyParsedUsageToState(providerId, parsed, { accountLabel: 'Manual Paste Sync' }, appState, appAccounts);
+      window.QuotaCore.appendHistorySnapshot(appState);
+      saveLocalBrowserState(appState);
+      saveLocalBrowserAccounts(appAccounts);
+      appRouting = window.QuotaCore.evaluateRoutes(appState, document.getElementById('taskSelect')?.value || 'deep');
+
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/accounts/parse-usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId, rawText })
+          });
+        } catch {}
+      }
+
+      renderAccountsForm();
+      render();
+      const box = document.getElementById('syncStatusBox');
+      if (box) {
+        box.classList.remove('hidden');
+        box.innerHTML = `<div class="text-emerald-400 font-semibold">✓ Synced ${escapeHtml(providerId)} directly in your browser (saved to localStorage)!</div>`;
+      }
+    }
+
+    function openAccountsModal() {
+      document.getElementById('accountsModal').classList.remove('hidden');
+      const proxyBox = document.getElementById('localProxyBox');
+      if (proxyBox) {
+        if (IS_LOCAL_COMPANION) {
+          proxyBox.classList.remove('hidden');
+          document.getElementById('proxyUrlCode').textContent = `${window.location.origin}/proxy/v1/chat/completions`;
+        } else {
+          proxyBox.classList.add('hidden');
+        }
+      }
+      renderAccountsForm();
+    }
+
+    function closeAccountsModal() {
+      document.getElementById('accountsModal').classList.add('hidden');
+    }
+
+    function renderAccountsForm() {
+      if (!appAccounts) return;
+      const area = document.getElementById('accountsFormArea');
+      const items = [
+        { id: 'claude', title: 'Claude (Anthropic)', signInLabel: 'Open Claude Usage', btnColor: 'bg-amber-600 hover:bg-amber-500', placeholder: 'sk-ant-api03-...' },
+        { id: 'codex', title: 'Codex (ChatGPT / OpenAI)', signInLabel: 'Open ChatGPT Usage', btnColor: 'bg-emerald-600 hover:bg-emerald-500', placeholder: 'sk-proj-...' },
+        { id: 'antigravity', title: 'Antigravity (Google)', signInLabel: 'Open Antigravity Usage', btnColor: 'bg-blue-600 hover:bg-blue-500', placeholder: 'AIzaSy...' },
+        { id: 'kimi', title: 'Kimi (kimi.ai / Moonshot)', signInLabel: 'Open Kimi.ai', btnColor: 'bg-purple-600 hover:bg-purple-500', placeholder: 'sk-kimi-...' }
+      ];
+
+      const localCliBlock = IS_LOCAL_COMPANION ? `
+        <div class="p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="font-semibold text-emerald-400">Local Companion Mode: Auto-Detect Signed-in CLIs</div>
+            <div class="text-muted">Automatically connects Claude Code (<code>~/.claude</code>), Codex CLI (<code>~/.codex</code>), and Antigravity (<code>~/.gemini</code>).</div>
+          </div>
+          <button id="autoDetectBtn" onclick="autoDetectAccounts()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition">
+            ⚡ 1-Click Auto-Detect CLI Logins
+          </button>
+        </div>
+      ` : '';
+
+      area.innerHTML = `
+        ${localCliBlock}
+        ${items.map(item => {
+          const p = appAccounts.providers[item.id] || {};
+          const apiKeySection = IS_LOCAL_COMPANION ? `
+            <details class="pt-1 border-t border-theme">
+              <summary class="cursor-pointer text-muted hover:text-white select-none">Local Companion Only: Enter API Key (stored locally in <code>data/accounts.json</code>)</summary>
+              <div class="mt-2 space-y-2">
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                  <input id="key_${item.id}" type="password" placeholder="${escapeHtml(item.placeholder)}" class="sm:col-span-3 card rounded-lg px-2.5 py-1.5" />
+                  <input id="url_${item.id}" type="text" value="${escapeHtml(p.baseUrl || '')}" class="sm:col-span-1 card rounded-lg px-2 py-1.5 text-muted" />
+                  <button onclick="saveProviderKey('${item.id}')" class="sm:col-span-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-2.5 py-1.5 font-medium transition">
+                    Save Key
+                  </button>
+                </div>
+              </div>
+            </details>
+          ` : '';
+
+          return `
+            <div class="p-3 rounded-xl border border-theme bg-black/15 space-y-2.5">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="font-semibold">${escapeHtml(item.title)}</span>
+                  <span class="ml-2 px-2 py-0.5 rounded font-mono ${p.connected ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-500/15 text-muted'}">
+                    ${p.connected ? 'Synced' : 'Not Synced'}
+                  </span>
+                </div>
+                <button onclick="signInWithProvider('${item.id}')" class="px-3 py-1.5 rounded-lg ${item.btnColor} text-white font-medium transition">
+                  ${escapeHtml(item.signInLabel)} ↗
+                </button>
+              </div>
+              <div class="text-muted">${escapeHtml(p.lastStatus || 'Ready to sync')} ${p.hasApiKey ? `• Saved: <code>${escapeHtml(p.apiKeyMasked)}</code>` : ''}</div>
+
+              <div class="flex gap-2 items-start">
+                <textarea id="paste_${item.id}" rows="2" placeholder="Paste text from ${escapeHtml(item.title)} usage page (Ctrl+A → Ctrl+C on usage page) to sync exact %..." class="flex-1 card rounded-lg px-2.5 py-1.5 text-xs"></textarea>
+                <button onclick="parseUsageText('${item.id}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium shrink-0 transition">
+                  Sync Text
+                </button>
+              </div>
+              ${apiKeySection}
+            </div>
+          `;
+        }).join('')}
+      `;
+    }
+
+    async function simulatePrompt() {
+      const taskType = document.getElementById('taskSelect').value;
+      const targetProvider = selectedProvider || 'claude';
+      const groupId = targetProvider === 'antigravity' ? 'claude_gpt_models' : null;
+
+      window.QuotaCore.mutateRecordUsage(appState, { providerId: targetProvider, groupId, amount: 15 });
+      appState.taskType = taskType;
+      saveLocalBrowserState(appState);
+      appRouting = window.QuotaCore.evaluateRoutes(appState, taskType);
+      render();
+
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: targetProvider, groupId, amount: 15, taskType })
+          });
+        } catch {}
+      }
+    }
+
+    async function applyReset(providerId, groupId, ticketId) {
+      const res = window.QuotaCore.mutateApplyReset(appState, { providerId, groupId, ticketId });
+      if (res.error) return alert(res.error);
+      appState = saveLocalBrowserState(res.state);
+      appRouting = window.QuotaCore.evaluateRoutes(appState, document.getElementById('taskSelect')?.value || 'deep');
+      render();
+
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId, groupId, ticketId })
+          });
+        } catch {}
+      }
+    }
+
+    async function resetDemo() {
+      appState = saveLocalBrowserState(window.QuotaCore.getInitialState());
+      appRouting = window.QuotaCore.evaluateRoutes(appState, document.getElementById('taskSelect')?.value || 'deep');
+      render();
+
+      if (IS_LOCAL_COMPANION) {
+        try {
+          await fetch('/api/demo/reset', { method: 'POST' });
+        } catch {}
+      }
+    }
+
+    async function generateHandoff() {
+      handoffOutput = window.QuotaCore.generateHandoffPrompt({
+        fromProvider: document.getElementById('handoffFrom').value,
+        toProvider: document.getElementById('handoffTo').value,
+        taskSummary: document.getElementById('handoffSummary').value,
+        currentFiles: document.getElementById('handoffFiles').value
+      });
+      renderBottomTab();
+    }
+
+    function copyText(text, btnId) {
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      }
+    }
+
+    function selectProviderCard(id) {
+      selectedProvider = id;
+      render();
+    }
+
+    function setCodexResetTab(tab) {
+      codexResetTab = tab;
+      renderResetDetail();
+    }
+
+    function setBottomTab(tab) {
+      bottomTab = tab;
+      document.getElementById('tabHandoff').className = tab === 'handoff'
+        ? 'px-2 py-0.5 rounded bg-blue-600 text-white'
+        : 'px-2 py-0.5 rounded border border-theme text-muted';
+      document.getElementById('tabTrend').className = tab === 'trend'
+        ? 'px-2 py-0.5 rounded bg-blue-600 text-white'
+        : 'px-2 py-0.5 rounded border border-theme text-muted';
+      renderBottomTab();
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light');
+      document.getElementById('themeBtn').textContent = document.body.classList.contains('light') ? 'Dark Mode' : 'Light Mode';
+    }
+
+    function toggleCompactMode() {
+      compactMode = !compactMode;
+      const shell = document.getElementById('appShell');
+      const grid = document.getElementById('cardsGrid');
+      const bottom = document.getElementById('bottomGrid');
+      if (compactMode) {
+        shell.classList.add('max-w-md', 'mx-auto');
+        grid.classList.remove('md:grid-cols-2', 'lg:grid-cols-4');
+        bottom.classList.remove('lg:grid-cols-2');
+        document.getElementById('modeBtn').textContent = 'Full Mode';
+      } else {
+        shell.classList.remove('max-w-md', 'mx-auto');
+        grid.classList.add('md:grid-cols-2', 'lg:grid-cols-4');
+        bottom.classList.add('lg:grid-cols-2');
+        document.getElementById('modeBtn').textContent = 'Tray Mode';
+      }
+    }
+
+    function connBadge(id) {
+      if (!appAccounts?.providers?.[id]) return '';
+      const p = appAccounts.providers[id];
+      return p.connected
+        ? `<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block" title="${escapeHtml(p.lastStatus)}"></span>`
+        : `<span class="w-2 h-2 rounded-full bg-zinc-500 inline-block" title="${escapeHtml(p.lastStatus || 'Not synced')}"></span>`;
+    }
+
+    function syncStatusLine(id) {
+      const p = appAccounts?.providers?.[id];
+      if (!p) return '';
+      const cls = p.connected ? 'text-emerald-400' : 'text-muted';
+      return `<div class="text-[11px] truncate ${cls}" title="${escapeHtml(p.lastStatus || '')}">${escapeHtml(p.lastStatus || 'Waiting for Browser Extension Auto-Sync')}</div>`;
+    }
+
+    async function revealExtensionFolder() {
+      if (IS_LOCAL_COMPANION) {
+        try {
+          const res = await fetch('/api/accounts/open-app', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: 'extension_folder' })
+          });
+          const data = await res.json();
+          const extPath = data.extensionPath || './browser-extension';
+          try { await navigator.clipboard.writeText(extPath); } catch {}
+          showMainSyncBanner(
+            `<strong>📂 เปิดโฟลเดอร์ Extension และคัดลอก Path ให้แล้ว:</strong> <code>${escapeHtml(extPath)}</code><br/>` +
+            `ในหน้า <code>brave://extensions</code> หรือ <code>chrome://extensions</code> เปิด <strong>Developer mode</strong> → กด <strong>Load unpacked</strong> แล้วเลือกโฟลเดอร์ <code>browser-extension</code> ได้เลยครับ`,
+            'amber'
+          );
+          return;
+        } catch {}
+      }
+      showMainSyncBanner(
+        `<strong>🧩 วิธีติดตั้ง Browser Extension (Zero-Storage v4.0):</strong><br/>` +
+        `1. ดาวน์โหลดหรือ Clone โปรเจคจาก <a href="https://github.com/mumiman/ai-quota-tracker" target="_blank" rel="noopener noreferrer" class="underline text-blue-400">github.com/mumiman/ai-quota-tracker</a><br/>` +
+        `2. เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → เปิดสวิตช์ <strong>Developer mode</strong><br/>` +
+        `3. กด <strong>Load unpacked</strong> แล้วเลือกโฟลเดอร์ <code>browser-extension</code> (ข้อมูลโควตาจะซิงค์ตรงเข้าหน้าเว็บนี้ภายในเบราว์เซอร์ของคุณ 100%)`,
+        'amber'
+      );
+    }
+
+    function renderTraySummary() {
+      const extVer = document.documentElement.getAttribute('data-quota-ext');
+      const extBadge = document.getElementById('extStatusBadge');
+      if (extBadge) {
+        if (extVer && !isExtensionVersionOutdated(extVer)) {
+          extBadge.className = 'cursor-pointer px-2 py-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-mono transition';
+          extBadge.textContent = `🟢 Ext v${extVer} Live`;
+        } else if (extVer) {
+          extBadge.className = 'cursor-pointer px-2 py-1 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono transition';
+          extBadge.textContent = `🟡 Ext v${extVer} (Reload → v4.0)`;
+        } else {
+          extBadge.className = 'cursor-pointer px-2 py-1 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono transition';
+          extBadge.textContent = '🟠 Extension Setup';
+        }
+      }
+
+      const agyPeak = Math.max(...appState.providers.antigravity.groups.flatMap(g => g.items.map(i => i.usedPct)));
+      const claudePeak = Math.max(...appState.providers.claude.metrics.map(m => m.usedPct));
+      const codexPeak = Math.max(...appState.providers.codex.limits.map(l => l.usedPct));
+      const kimiPeak = appState.providers.kimi ? Math.max(...appState.providers.kimi.limits.map(l => l.usedPct)) : 0;
+      const dot = (pct) => pct >= 75 ? '🔴' : pct >= 50 ? '🟡' : '🟢';
+      document.getElementById('traySummary').innerHTML = `
+        <span class="px-2 py-0.5 rounded bg-black/20">${dot(agyPeak)} AGY: ${Number(agyPeak) || 0}%</span>
+        <span class="px-2 py-0.5 rounded bg-black/20">${dot(claudePeak)} Claude: ${Number(claudePeak) || 0}%</span>
+        <span class="px-2 py-0.5 rounded bg-black/20">${dot(codexPeak)} Codex: ${Number(codexPeak) || 0}%</span>
+        <span class="px-2 py-0.5 rounded bg-black/20">${dot(kimiPeak)} Kimi: ${Number(kimiPeak) || 0}%</span>
+      `;
+    }
+
+    function renderAlerts() {
+      const area = document.getElementById('alertsArea');
+      if (!appRouting.alerts || appRouting.alerts.length === 0) {
+        area.innerHTML = '';
+        return;
+      }
+      area.innerHTML = appRouting.alerts.map(a => {
+        const cls = a.severity === 'critical'
+          ? 'border-red-500/50 bg-red-500/10 text-red-400'
+          : 'border-amber-500/50 bg-amber-500/10 text-amber-400';
+        return `<div class="rounded-lg border px-3 py-2 text-xs ${cls}"><strong>${a.severity === 'critical' ? '⚠ Quota Alert:' : '💡 Smart Advisor:'}</strong> ${escapeHtml(a.message)}</div>`;
+      }).join('');
+    }
+
+    function renderCards() {
+      const { antigravity: agy, claude, codex, kimi } = appState.providers;
+      const isSel = (id) => selectedProvider === id;
+
+      const agyHtml = `
+        <div onclick="selectProviderCard('antigravity')"
+             class="card card-interactive cursor-pointer rounded-xl p-3.5 space-y-2.5 transition"
+             style="${isSel('antigravity') ? 'border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6;' : ''}">
+          <div class="border-b border-theme pb-2 space-y-1">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-semibold text-sm flex items-center gap-1.5">${connBadge('antigravity')} Antigravity</span>
+              <div class="flex items-center gap-1">
+                <button onclick="event.stopPropagation(); openAntigravityUsageModal()" class="px-1.5 py-0.5 rounded border border-theme text-muted hover:text-white text-[11px] transition" title="Manual Mirror / Paste">
+                  Edit
+                </button>
+                <button onclick="event.stopPropagation(); openAndSyncProvider('antigravity')" class="px-2 py-0.5 rounded bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/40 text-[11px] font-medium transition">
+                  Open & Sync ↗
+                </button>
+              </div>
+            </div>
+            ${syncStatusLine('antigravity')}
+          </div>
+          ${agy.groups.map((grp, idx) => `
+            <div class="space-y-2 ${idx > 0 ? 'pt-2 border-t border-theme' : ''}">
+              <div class="text-xs font-semibold">${escapeHtml(grp.name)}</div>
+              ${grp.items.map(it => renderBarRow(it)).join('')}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      const claudeHtml = `
+        <div onclick="selectProviderCard('claude')"
+             class="card card-interactive cursor-pointer rounded-xl p-3.5 space-y-3 transition"
+             style="${isSel('claude') ? 'border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6;' : ''}">
+          <div class="border-b border-theme pb-2 space-y-1">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-semibold text-sm flex items-center gap-1.5">${connBadge('claude')} Claude</span>
+              <button onclick="event.stopPropagation(); openAndSyncProvider('claude')" class="px-2 py-0.5 rounded bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 text-[11px] font-medium transition">
+                Open Usage ↗
+              </button>
+            </div>
+            ${syncStatusLine('claude')}
+          </div>
+          <div class="text-xs font-medium">${escapeHtml(claude.summary)}</div>
+          ${claude.metrics.map(m => `<div class="pt-2 border-t border-theme">${renderBarRow(m)}</div>`).join('')}
+        </div>
+      `;
+
+      const codexHtml = `
+        <div onclick="selectProviderCard('codex')"
+             class="card card-interactive cursor-pointer rounded-xl p-3.5 space-y-3 transition"
+             style="${isSel('codex') ? 'border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6;' : ''}">
+          <div class="border-b border-theme pb-2 space-y-1">
+            <div class="flex items-center justify-between gap-1">
+              <div class="flex items-center gap-1.5">
+                <span class="font-semibold text-sm flex items-center gap-1.5">${connBadge('codex')} Codex</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono">${codex.resetsAvailable.length} Resets</span>
+              </div>
+              <button onclick="event.stopPropagation(); openAndSyncProvider('codex')" class="px-2 py-0.5 rounded bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/40 text-[11px] font-medium transition">
+                Open Usage ↗
+              </button>
+            </div>
+            ${syncStatusLine('codex')}
+          </div>
+          <div class="text-xs text-muted">${escapeHtml(codex.summary)}</div>
+          ${codex.limits.map(lim => `<div class="pt-2 border-t border-theme">${renderBarRow(lim)}</div>`).join('')}
+        </div>
+      `;
+
+      const kimiHtml = kimi ? `
+        <div onclick="selectProviderCard('kimi')"
+             class="card card-interactive cursor-pointer rounded-xl p-3.5 space-y-3 transition"
+             style="${isSel('kimi') ? 'border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6;' : ''}">
+          <div class="border-b border-theme pb-2 space-y-1">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-semibold text-sm flex items-center gap-1.5">${connBadge('kimi')} Kimi (kimi.ai)</span>
+              <button onclick="event.stopPropagation(); openAndSyncProvider('kimi')" class="px-2 py-0.5 rounded bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/40 text-[11px] font-medium transition">
+                Open Kimi ↗
+              </button>
+            </div>
+            ${syncStatusLine('kimi')}
+          </div>
+          <div class="text-xs text-muted">${escapeHtml(kimi.summary)}</div>
+          ${kimi.limits.map(lim => `<div class="pt-2 border-t border-theme">${renderBarRow(lim)}</div>`).join('')}
+        </div>
+      ` : '';
+
+      document.getElementById('cardsGrid').innerHTML = agyHtml + claudeHtml + codexHtml + kimiHtml;
+    }
+
+    function renderResetDetail() {
+      const panel = document.getElementById('resetDetailPanel');
+      if (selectedProvider === 'codex') {
+        const codex = appState.providers.codex;
+        const isAvail = codexResetTab === 'available';
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-theme pb-2.5">
+            <div>
+              <h3 class="text-sm font-semibold">Codex — Usage limit resets</h3>
+              <p class="text-xs text-muted">Use a reset to restore your 5-hour limit, weekly limit, or both back to 0% used</p>
+            </div>
+            <div class="flex items-center gap-1 p-0.5 rounded-lg border border-theme text-xs">
+              <button onclick="setCodexResetTab('available')" class="px-2.5 py-1 rounded-md ${isAvail ? 'bg-blue-600 text-white font-medium' : 'text-muted'}">Available ${codex.resetsAvailable.length}</button>
+              <button onclick="setCodexResetTab('history')" class="px-2.5 py-1 rounded-md ${!isAvail ? 'bg-blue-600 text-white font-medium' : 'text-muted'}">History ${codex.resetsHistory.length}</button>
+            </div>
+          </div>
+          <div class="divide-y divide-[var(--border)]">
+            ${isAvail ? (
+              codex.resetsAvailable.length > 0 ? codex.resetsAvailable.map(r => `
+                <div class="py-2.5 flex items-center justify-between gap-2 text-xs">
+                  <div><div class="font-medium">${escapeHtml(r.title)}</div><div class="text-muted">${escapeHtml(r.expires)}</div></div>
+                  <button onclick="applyReset('codex', null, '${escapeHtml(r.id)}')" class="px-3 py-1.5 rounded-lg border border-theme hover:bg-blue-600 hover:text-white hover:border-blue-600 font-medium transition">Use reset</button>
+                </div>
+              `).join('') : `<div class="py-4 text-center text-xs text-muted">No resets remaining. Switch to Antigravity or Claude!</div>`
+            ) : codex.resetsHistory.map(h => `
+              <div class="py-2.5 flex items-center justify-between gap-2 text-xs">
+                <div><div class="font-medium">${escapeHtml(h.title)}</div><div class="text-muted">${escapeHtml(h.usedAt)}</div></div>
+                <span class="font-mono text-muted">Applied</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (selectedProvider === 'antigravity') {
+        const agy = appState.providers.antigravity;
+        panel.innerHTML = `
+          <div class="border-b border-theme pb-2.5">
+            <h3 class="text-sm font-semibold">Antigravity — Model Group Reset Schedule</h3>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            ${agy.groups.map(grp => `
+              <div class="p-3 rounded-lg border border-theme bg-black/15 flex flex-col justify-between space-y-2">
+                <div class="space-y-1">
+                  <div class="font-semibold">${escapeHtml(grp.name)}</div>
+                  ${grp.items.map(it => `<div class="flex justify-between text-muted"><span>${escapeHtml(it.label.split(' ')[0])}</span><span class="font-mono ${getTextColorClass(it.usedPct)}">${Number(it.usedPct) || 0}% used</span></div>`).join('')}
+                </div>
+                <button onclick="applyReset('antigravity', '${escapeHtml(grp.id)}')" class="w-full py-1.5 rounded-lg border border-theme hover:border-blue-500 font-medium transition">Reset Pool to 0%</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (selectedProvider === 'kimi' && appState.providers.kimi) {
+        const kimi = appState.providers.kimi;
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-theme pb-2.5">
+            <div>
+              <h3 class="text-sm font-semibold">Kimi (kimi.ai) — Session & Weekly Reset Schedule</h3>
+              <p class="text-xs text-muted">Reset 5h Thinking window or Weekly limit back to 0% used</p>
+            </div>
+            <button onclick="applyReset('kimi', 'all')" class="px-3 py-1 rounded-lg border border-theme hover:border-blue-500 text-xs font-medium transition">
+              Reset All Kimi
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            ${kimi.limits.map(lim => `
+              <div class="p-3 rounded-lg border border-theme bg-black/15 flex items-center justify-between gap-2">
+                <div>
+                  <div class="font-semibold">${escapeHtml(lim.label)} (<span class="font-mono ${getTextColorClass(lim.usedPct)}">${Number(lim.usedPct) || 0}% used</span>)</div>
+                  <div class="text-muted">${escapeHtml(lim.resetText)}</div>
+                </div>
+                <button onclick="applyReset('kimi', '${escapeHtml(lim.id)}')" class="px-3 py-1.5 rounded-lg border border-theme hover:border-blue-500 font-medium transition">Reset to 0%</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        const claude = appState.providers.claude;
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-theme pb-2.5">
+            <div>
+              <h3 class="text-sm font-semibold">Claude — Session, Weekly & Fable Reset Schedule</h3>
+              <p class="text-xs text-muted">Reset individual windows or clear all Claude usage counters</p>
+            </div>
+            <button onclick="applyReset('claude', 'all')" class="px-3 py-1 rounded-lg border border-theme hover:border-blue-500 text-xs font-medium transition">
+              Reset All Claude
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            ${claude.metrics.map(m => `
+              <div class="p-3 rounded-lg border border-theme bg-black/15 flex flex-col justify-between gap-2">
+                <div>
+                  <div class="font-semibold">${escapeHtml(m.label)} (<span class="font-mono ${getTextColorClass(m.usedPct)}">${Number(m.usedPct) || 0}% used</span>)</div>
+                  ${m.subtitle ? `<div class="text-muted">${escapeHtml(m.subtitle)}</div>` : ''}
+                  <div class="text-muted">${escapeHtml(m.resetText)} • in ${escapeHtml(m.countdown)}</div>
+                </div>
+                <button onclick="applyReset('claude', '${escapeHtml(m.id)}')" class="w-full py-1.5 rounded-lg border border-theme hover:border-blue-500 font-medium transition">Reset ${escapeHtml(m.label)} to 0%</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function renderRouter() {
+      const rec = appRouting.recommended;
+      document.getElementById('routerContent').innerHTML = `
+        <div class="p-3 rounded-lg border border-blue-500/40 bg-blue-500/10 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-blue-400">★ Recommended: ${escapeHtml(rec.label)}</span>
+            <span class="font-mono text-emerald-400">${Number(rec.usedPct) || 0}% used (${Number(rec.headroom) || 0}% left)</span>
+          </div>
+          <p class="text-muted">${escapeHtml(appRouting.reason)}</p>
+          <div class="flex items-center gap-2 pt-1">
+            <code class="flex-1 px-2 py-1 rounded bg-black/30 font-mono text-xs truncate">${escapeHtml(rec.command)}</code>
+            <button id="copyCmdBtn" onclick="copyText('${escapeHtml(rec.command.replace(/'/g, "\\'"))}', 'copyCmdBtn')" class="px-2.5 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-500 transition">Copy CLI</button>
+          </div>
+        </div>
+        <div class="space-y-1">
+          ${appRouting.ranked.map((r, i) => `
+            <div class="flex items-center justify-between py-1 border-b border-theme last:border-0">
+              <span>${i + 1}. ${escapeHtml(r.label)}</span>
+              <span class="font-mono ${getTextColorClass(r.usedPct)}">${Number(r.usedPct) || 0}% used</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderBottomTab() {
+      const container = document.getElementById('bottomTabContent');
+      if (bottomTab === 'handoff') {
+        container.innerHTML = `
+          <div class="space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <select id="handoffFrom" class="w-full card rounded px-2 py-1"><option>Claude</option><option>Antigravity (Claude/GPT)</option><option>Codex</option><option>Kimi (kimi.ai)</option></select>
+              <select id="handoffTo" class="w-full card rounded px-2 py-1"><option>Antigravity (Gemini 4 Argon)</option><option>Kimi (kimi-k2-thinking)</option><option>Codex (o3-mini)</option><option>Claude (Sonnet)</option></select>
+            </div>
+            <input id="handoffSummary" type="text" placeholder="Task summary (e.g. Refactoring auth middleware)" class="w-full card rounded px-2 py-1.5" />
+            <input id="handoffFiles" type="text" placeholder="Active files (e.g. server.js, src/router.js)" class="w-full card rounded px-2 py-1.5" />
+            <div class="flex gap-2">
+              <button onclick="generateHandoff()" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium transition">Generate Handoff Prompt</button>
+              ${handoffOutput ? `<button id="copyHandoffBtn" onclick="copyText(handoffOutput, 'copyHandoffBtn')" class="px-3 py-1.5 rounded border border-theme hover:opacity-80">Copy Prompt</button>` : ''}
+            </div>
+            ${handoffOutput ? `<pre class="p-2 rounded bg-black/30 border border-theme font-mono text-xs whitespace-pre-wrap max-h-36 overflow-y-auto">${escapeHtml(handoffOutput)}</pre>` : ''}
+          </div>
+        `;
+      } else {
+        const hist = appState.history || [];
+        const w = 420, h = 150, pad = 24;
+        const pts = (key) => hist.map((pt, i) => `${(pad + (i / Math.max(1, hist.length - 1)) * (w - pad * 2)).toFixed(1)},${(h - pad - ((pt[key] || 0) / 100) * (h - pad * 2)).toFixed(1)}`).join(' ');
+        container.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex flex-wrap items-center gap-3 text-xs">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Antigravity</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Claude</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Codex</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Kimi</span>
+            </div>
+            <svg viewBox="0 0 ${w} ${h}" class="w-full h-40 rounded bg-black/20 border border-theme">
+              <line x1="${pad}" y1="${h - pad - 0.75 * (h - pad * 2)}" x2="${w - pad}" y2="${h - pad - 0.75 * (h - pad * 2)}" stroke="#ef4444" stroke-dasharray="4 3" stroke-opacity="0.5" />
+              <polyline fill="none" stroke="#3b82f6" stroke-width="2" points="${pts('antigravity')}" />
+              <polyline fill="none" stroke="#10b981" stroke-width="2" points="${pts('claude')}" />
+              <polyline fill="none" stroke="#f59e0b" stroke-width="2" points="${pts('codex')}" />
+              <polyline fill="none" stroke="#a855f7" stroke-width="2" points="${pts('kimi')}" />
+            </svg>
+          </div>
+        `;
+      }
+    }
+
+    function render() {
+      if (!appState || !appRouting) return;
+      renderTraySummary();
+      renderAlerts();
+      renderCards();
+      renderResetDetail();
+      renderRouter();
+      renderBottomTab();
+    }
+
+    const extAttrObserver = new MutationObserver(() => {
+      if (appState) renderTraySummary();
+    });
+    extAttrObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-quota-ext']
+    });
+
+    window.addEventListener('message', (ev) => {
+      if (ev.source !== window || !ev.data) return;
+      if (ev.data.type === 'QUOTA_TRACKER_DIRECT_USAGE' && ev.data.payload) {
+        applyDirectExtensionSync(ev.data.payload);
+      }
+      if (ev.data.type === 'QUOTA_TRACKER_EXT_READY' || ev.data.type === 'QUOTA_TRACKER_SYNC_DONE') {
+        fetchState();
+      }
+    });
+
+    fetchState();
+    setInterval(() => {
+      if (!IS_LOCAL_COMPANION) return;
+      const modal = document.getElementById('accountsModal');
+      if (modal && modal.classList.contains('hidden')) {
+        fetchState();
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

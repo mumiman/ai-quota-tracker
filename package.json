@@ -1,0 +1,36 @@
+{
+  "name": "ai-quota-tracker",
+  "version": "4.0.0",
+  "description": "Zero-retention, privacy-first LLM Quota Tracker & Smart Model Switcher for Antigravity, Claude, Codex (ChatGPT), and Kimi.ai — 100% browser localStorage & MV3 Extension sync, deployable on Vercel.",
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mumiman/ai-quota-tracker.git"
+  },
+  "homepage": "https://github.com/mumiman/ai-quota-tracker#readme",
+  "bugs": {
+    "url": "https://github.com/mumiman/ai-quota-tracker/issues"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/api.test.js"
+  },
+  "keywords": [
+    "llm",
+    "quota",
+    "claude",
+    "codex",
+    "chatgpt",
+    "antigravity",
+    "gemini",
+    "kimi",
+    "model-switcher",
+    "privacy-first",
+    "zero-storage",
+    "vercel"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

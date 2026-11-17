@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      width: 310px;
+      margin: 0;
+      padding: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #161922;
+      color: #e6e8ef;
+      font-size: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    h3 { margin: 0; font-size: 13px; }
+    .badge {
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+    }
+    p { margin: 0 0 10px 0; color: #8b93a7; line-height: 1.4; }
+    .status-list {
+      background: #0f1117;
+      border: 1px solid #262b38;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid #1c202b;
+    }
+    .status-item:last-child { border-bottom: none; }
+    button {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      border: 1px solid #262b38;
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button.secondary { background: #1f2430; color: #e6e8ef; }
+    button:hover { opacity: 0.9; }
+    #status { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #0f1117; display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>LLM Quota Auto-Sync v4.0</h3>
+    <span class="badge">🔒 ZERO-STORAGE</span>
+  </div>
+  <p>Syncs open Claude, ChatGPT/Codex, Kimi.ai, and Antigravity tabs directly inside your browser (100% private).</p>
+
+  <div class="status-list" id="syncList">
+    <div class="status-item"><span>Claude</span><span id="st_claude" style="color:#8b93a7">Waiting for tab...</span></div>
+    <div class="status-item"><span>Codex</span><span id="st_codex" style="color:#8b93a7">Waiting for tab...</span></div>
+    <div class="status-item"><span>Antigravity</span><span id="st_antigravity" style="color:#8b93a7">Waiting for tab...</span></div>
+    <div class="status-item"><span>Kimi.ai</span><span id="st_kimi" style="color:#8b93a7">Waiting for tab...</span></div>
+  </div>
+
+  <button id="syncAllBtn">⚡ Force Sync All Open Tabs</button>
+  <button id="openDashboardBtn" class="secondary">Open Dashboard ↗</button>
+  <button id="openAntigravityBtn" class="secondary">Open Antigravity Models & Usage ↗</button>
+  <button id="openClaudeBtn" class="secondary">Open Claude Usage Page ↗</button>
+  <button id="openCodexBtn" class="secondary">Open Codex Usage Page ↗</button>
+  <button id="openKimiBtn" class="secondary">Open Kimi.ai Page ↗</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
