@@ -25,7 +25,7 @@ The accompanying Manifest V3 Browser Extension (`browser-extension/`) adheres to
   - `X-Frame-Options: DENY` (`frame-ancestors 'none'`) to prevent clickjacking
   - `X-Content-Type-Options: nosniff`
 
-## 4. Optional Local Companion Mode (`node server.js`)
+## 4. Optional Local Companion Mode (`node companion/server.js`)
 
 If you choose to run the optional Local Companion server on your own machine:
 - The server binds exclusively to `127.0.0.1` (loopback) by default so other devices on your local network cannot access port `3456`.

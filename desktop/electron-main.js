@@ -1,5 +1,5 @@
 const path = require('path');
-const { createServer } = require('../server');
+const { createServer } = require('../companion/server');
 
 // Electron Desktop / Menu Bar wrapper with native "Sign in with Claude / ChatGPT / Google"
 // Run with: npx electron desktop/electron-main.js

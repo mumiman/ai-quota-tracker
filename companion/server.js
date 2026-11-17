@@ -1,14 +1,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { loadState, saveState, resetDemoState, appendHistorySnapshot, recordUsage, applyReset } = require('./src/store');
-const { evaluateRoutes, generateHandoffPrompt } = require('./src/router');
-const { scanLocalEnvironments } = require('./src/scanner');
-const { getMaskedAccounts, updateAccountConfig, updateGlobalSettings, autoDetectLocalLogins, loadAccounts, saveAccounts } = require('./src/accounts');
-const { syncAllAccounts, parseUsagePageText, applyParsedUsageToState } = require('./src/connectors');
-const { handleProxyChatCompletion } = require('./src/proxy');
+const { loadState, saveState, resetDemoState, appendHistorySnapshot, recordUsage, applyReset } = require('../src/store');
+const { evaluateRoutes, generateHandoffPrompt } = require('../src/router');
+const { scanLocalEnvironments } = require('../src/scanner');
+const { getMaskedAccounts, updateAccountConfig, updateGlobalSettings, autoDetectLocalLogins, loadAccounts, saveAccounts } = require('../src/accounts');
+const { syncAllAccounts, parseUsagePageText, applyParsedUsageToState } = require('../src/connectors');
+const { handleProxyChatCompletion } = require('../src/proxy');
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 function getAllowedOrigin(req) {
   const origin = req.headers.origin || '';
@@ -179,7 +179,7 @@ function createServer() {
         const { providerId } = body;
         const acc = loadAccounts();
         const webUrl = acc.providers?.[providerId]?.webUrl || null;
-        const extensionPath = path.join(__dirname, 'browser-extension');
+        const extensionPath = path.join(__dirname, '..', 'browser-extension');
         if (process.platform === 'darwin' && !process.env.VERCEL) {
           const { execFile } = require('child_process');
           if (providerId === 'antigravity') {
@@ -280,7 +280,6 @@ function createServer() {
         return sendJson(req, res, 200, { prompt });
       }
 
-      // Serve static files from public/
       if (req.method === 'GET' && pathname === '/js/quota-core.js') {
         const jsPath = path.join(PUBLIC_DIR, 'js', 'quota-core.js');
         const content = fs.readFileSync(jsPath, 'utf8');
@@ -289,6 +288,14 @@ function createServer() {
           'X-Content-Type-Options': 'nosniff'
         });
         return res.end(content);
+      }
+
+      if (req.method === 'GET' && (pathname === '/favicon.svg' || pathname === '/favicon.ico')) {
+        const svgPath = path.join(PUBLIC_DIR, 'favicon.svg');
+        if (fs.existsSync(svgPath)) {
+          res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+          return res.end(fs.readFileSync(svgPath));
+        }
       }
 
       if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {

@@ -8,7 +8,7 @@ const path = require('node:path');
 const tempDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'quota-tracker-test-'));
 process.env.QUOTA_DATA_DIR = tempDataDir;
 
-const { createServer } = require('../server');
+const { createServer } = require('../companion/server');
 const { parseRateLimitHeaders } = require('../src/connectors');
 
 let server;
