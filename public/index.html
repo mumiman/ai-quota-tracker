@@ -745,7 +745,7 @@
     function isExtensionVersionOutdated(ver) {
       if (!ver) return true;
       const parts = String(ver).split('.').map(n => Number(n) || 0);
-      const minParts = [3, 6, 0];
+      const minParts = [4, 0, 0];
       for (let i = 0; i < 3; i++) {
         if ((parts[i] || 0) < minParts[i]) return true;
         if ((parts[i] || 0) > minParts[i]) return false;
@@ -810,10 +810,15 @@
           renderSyncStatusBox(`✓ Synced at ${timeStr} via Local Companion`);
         } else {
           showMainSyncBanner(
-            `<strong>💡 ติดตั้งหรือ Reload Browser Extension (v4.0):</strong> เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → เปิด <strong>Developer mode</strong> → กด <strong>Load unpacked</strong> เลือกโฟลเดอร์ <code>browser-extension</code> เพื่อซิงค์อัตโนมัติแบบไม่ส่งข้อมูลขึ้นเซิร์ฟเวอร์ หรือวางข้อความ Usage ในปุ่ม <strong>Sync & Privacy Settings</strong> ได้เลยครับ`,
+            `<div class="flex flex-wrap items-center justify-between gap-2">` +
+            `<div><strong>⚠ ต้องอัปเกรดเป็น Browser Extension v4.0 (เวอร์ชัน 3.6 เดิมซิงค์ได้เฉพาะ localhost:3456):</strong><br/>` +
+            `1. ดาวน์โหลดไฟล์ Extension v4.0 แล้วแตกไฟล์ (.zip)<br/>` +
+            `2. เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → กด <strong>Remove</strong> ตัวเก่า (v3.6) แล้วกด <strong>Load unpacked</strong> เลือกโฟลเดอร์ <code>browser-extension</code> ตัวใหม่ (หรือวางข้อความ Usage ในปุ่ม <strong>Sync & Privacy Settings</strong>)</div>` +
+            `<a href="/ai-quota-tracker-extension-v4.0.zip" download class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0 transition">⬇ Download Extension v4.0 (.zip)</a>` +
+            `</div>`,
             'amber'
           );
-          renderSyncStatusBox(`Checked at ${timeStr} — Install/Reload Browser Extension or Paste Usage Text`);
+          renderSyncStatusBox(`Checked at ${timeStr} — Install/Upgrade to Extension v4.0 for Vercel Direct Sync`);
         }
       } finally {
         btn.textContent = 'Sync Now';
@@ -1136,10 +1141,13 @@
         } catch {}
       }
       showMainSyncBanner(
-        `<strong>🧩 วิธีติดตั้ง Browser Extension (Zero-Storage v4.0):</strong><br/>` +
-        `1. ดาวน์โหลดหรือ Clone โปรเจคจาก <a href="https://github.com/mumiman/ai-quota-tracker" target="_blank" rel="noopener noreferrer" class="underline text-blue-400">github.com/mumiman/ai-quota-tracker</a><br/>` +
-        `2. เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → เปิดสวิตช์ <strong>Developer mode</strong><br/>` +
-        `3. กด <strong>Load unpacked</strong> แล้วเลือกโฟลเดอร์ <code>browser-extension</code> (ข้อมูลโควตาจะซิงค์ตรงเข้าหน้าเว็บนี้ภายในเบราว์เซอร์ของคุณ 100%)`,
+        `<div class="flex flex-wrap items-center justify-between gap-2">` +
+        `<div><strong>🧩 วิธีติดตั้ง / อัปเกรด Browser Extension (Zero-Storage v4.0):</strong><br/>` +
+        `1. กดปุ่ม <strong>Download Extension v4.0 (.zip)</strong> ด้านขวา แล้วแตกไฟล์ (Double-click <code>.zip</code>)<br/>` +
+        `2. เปิด <code>brave://extensions</code> หรือ <code>chrome://extensions</code> → เปิด <strong>Developer mode</strong> (ถ้ามี v3.6 เดิมอยู่ให้กด Remove ก่อน)<br/>` +
+        `3. กด <strong>Load unpacked</strong> แล้วเลือกโฟลเดอร์ <code>browser-extension</code> ที่แตกไฟล์ไว้ — แล้วกด Refresh หน้านี้!</div>` +
+        `<a href="/ai-quota-tracker-extension-v4.0.zip" download class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0 transition">⬇ Download Extension v4.0 (.zip)</a>` +
+        `</div>`,
         'amber'
       );
     }
